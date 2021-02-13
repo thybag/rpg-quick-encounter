@@ -48,9 +48,10 @@ export default Component.define({
         });
 
         props.on('updated', () => {
-          //  console.log(props);
-           console.log(JSON.stringify(props.data));
-           window.localStorage.setItem(config.options.map, JSON.stringify(props.data));
+            //  console.log(props);
+            // console.log(JSON.stringify(props.data));
+            console.log("save");
+            window.localStorage.setItem(config.options.map, JSON.stringify(props.data));
         });
 
 

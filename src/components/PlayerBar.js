@@ -40,7 +40,9 @@ export default Component.define({
     render: async function () 
     {
         this.options.players.map(player => {
-            this.el.appendChild(playerTpl(player));
+            let playerToken = playerTpl(player);
+            if (player.spawned) playerToken.classList.add('spawned');
+            this.el.appendChild(playerToken);
         });
 
         dragSort(this.el.children);       

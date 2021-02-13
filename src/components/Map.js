@@ -35,14 +35,26 @@ export default Component.define({
             iconAnchor:   [35, 35],
         });
 
-        return L.marker(
-            this.map.getCenter(),
+        let position = (ref.x) ? L.latLng(ref.x, ref.y) : this.map.getCenter()
+            
+        const marker = L.marker(
+            position,
             {
                 icon: icon, 
                 draggable: true,
                 ref: ref
             }
         ).addTo(this.map);
+
+        marker.on('dragend', function(event) {
+            const latLng = event.target.getLatLng();
+
+            // Sync
+            event.target.options.ref.x = latLng.lat;
+            event.target.options.ref.y = latLng.lng;
+        });
+
+        return marker;
     },
     focusPlayer: function(player) {
         console.log("focus", playerToIconMap[player.id]);
@@ -62,11 +74,28 @@ export default Component.define({
     },
     render: async function () 
     {
-        console.log("!!aaa");
-        console.log("!!",this.options.map);
         // Grab image from URL
         this.map = await createMap('map', this.options.map);
         this.fog = fogOfWar(this.map);
+
+        // Load config from settings
+        if (!this.options.fog.mask){
+            this.options.fog.mask = JSON.stringify(this.fog.getLatLngs());
+        }
+        this.fog.setLatLngs(JSON.parse(this.options.fog.mask));
+        this.fogToggled(this.options.fog.enabled);
+        this.fogOpacityChanged(this.options.fog.opacity);
+
+        // Boot players
+        for (const player of Object.values(this.options.players)) {
+            if (player.spawned) {
+                this.trigger('map:player:spawn', player);
+            }
+        }
+        // Boot spawns
+        for (const spawn of Object.values(this.options.spawns)) {
+            this.trigger('map:spawn', spawn);
+        }
 
         this.map.on('click', e => { 
             if (!this.options.fog.enabled) return;
