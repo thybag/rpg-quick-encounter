@@ -1,0 +1,19 @@
+{
+ "name": "rpg-encounter",
+ "version": "0.0.1",
+ "private": true,
+ "license": "MIT",
+ "dependencies": {
+  "@rollup/plugin-commonjs": "^17.1.0",
+  "@rollup/plugin-node-resolve": "^11.1.1",
+  "@turf/turf": "^6.2.0",
+  "leaflet": "^1.7.1",
+  "lumpjs": "git+ssh://git@github.com/thybag/lump.js.git",
+  "rollup": "^2.39.0",
+  "rollup-plugin-import-css": "^2.0.0"
+ },
+ "scripts": {
+  "build": "rollup -c",
+  "watch": "rollup -c --watch"
+ }
+}
