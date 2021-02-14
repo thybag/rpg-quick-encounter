@@ -8,11 +8,11 @@ Try it here (no logins needed):
 **Grab a map** To start, grab a map image you'd like to use. Plenty of great ones are shared on https://www.reddit.com/r/dndmaps/
 
 #### How to use it
-**Players:** Click a player to spawn them on the map, then drag them around as need be. Double click to rename.
-**Spawn NPC's:** Just select name/image from spawn menu and drag them as need be.
-**Fog:** click to clear an area of fog, right click to re-add it. You can control fog opacity, clearing size or just turn it off in the fog menu.
-**Auto save:** every action is saved to your local storage so you can quickly resume a game at your leisure.
-**Player bar** Click a player to spawn or focus on them & reorder freely to match turn order.
+**Players:** Click a player to spawn them on the map, then drag them around as need be. Double click to rename.   
+**Spawn NPC's:** Just select name/image from spawn menu and drag them as need be.   
+**Fog:** click to clear an area of fog, right click to re-add it. You can control fog opacity, clearing size or just turn it off in the fog menu.   
+**Auto save:** every action is saved to your local storage so you can quickly resume a game at your leisure.   
+**Player bar** Click a player to spawn or focus on them & reorder freely to match turn order.   
 
 #### Planned features
 * Better getting started wizard
@@ -22,11 +22,10 @@ Try it here (no logins needed):
 * Ability to add overlays for injured or dead NPC's.
 * Proper dialogs - currently I'm slumming it with conform/prompts.
 
-## Credits;
+## Credits
 Released by Carl Saggs under the MIT license.
 
 Made possible by the great work in;
-
 * [Leaflet.js](https://leafletjs.com/) - Powering the maps themselves
 * [Rollup.js](https://rollupjs.org/) - Build tooling
 * [turf.js](https://turfjs.org/) - Clever GeoJson tools.
