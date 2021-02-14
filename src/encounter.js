@@ -5,15 +5,17 @@ import EncounterMap from './components/Map.js';
 import Players from './components/PlayerBar.js';
 import Controls from './components/Controls.js';
 
-
 export default Component.define({
     initialize: function (config) {
+        // Take control of root
+        this.el = document.querySelector('body');
+        this.el.classList = 'app';
 
         // Get config or load from local storage
         if (window.localStorage) {
             let restore = window.localStorage.getItem(config.options.map);
-            if (restore /*&& confirm("Save found - restore?")*/){
-                config.options = JSON.parse(restore);
+            if (restore){
+               config.options = JSON.parse(restore);
             } 
         }
 

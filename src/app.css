@@ -4,7 +4,25 @@ body {
 	font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol;
 	font-size: 16px;
 	overflow: hidden;
+  background:#ccc;
 }
+
+input {
+    padding: .5rem;
+    font-size: 1.1rem;
+}
+input[type='submit'] {
+    border-radius:0;
+    cursor:pointer;
+    border:solid 1px #24c37e;
+    background:#24c37e;
+    color:#fff;
+    apperi
+}
+input[type='submit']:hover {
+    background:#1a8758;
+}
+
 #map {
 	width:100vw;
 	height: calc(100vh - 40px);
@@ -23,7 +41,7 @@ body {
     position: absolute;
     bottom:2rem;
     left:1rem;
-    z-index:9999;
+    z-index:1000;
     height:85px;
 }
 
@@ -85,6 +103,12 @@ body {
 #control-bar span:hover, #control-bar a:hover {
 	background:#1a8758;
 }
+#control-bar span{
+    display:none;
+}
+.app #control-bar span{
+    display:block;
+}
 
 /* fog controls */
 .fog-controls {
@@ -95,8 +119,8 @@ body {
 
 	right: 2px;
 	bottom: 42px;
-  z-index: 1000;
-  background: #fff;
+    z-index: 1010;
+    background: #fff;
 }
 .fog-controls label {
 	flex:2;
@@ -155,11 +179,11 @@ body {
 }
 
 .fog-controls .toggle input:checked + span {
-  background-color: #2196F3;
+  background-color: #24c37e;
 }
 
 .fog-controls .toggle input:focus + span {
-  box-shadow: 0 0 1px #2196F3;
+  box-shadow: 0 0 1px #24c37e;
 }
 
 .fog-controls input:checked + span:before {
@@ -170,7 +194,7 @@ body {
 /* image picker */
 .image-picker {
   position: absolute;
-  z-index: 9999;
+  z-index: 1200;
   top: calc(50vh - 250px);
   background: #ffff;
   width: 50vw;
@@ -181,7 +205,7 @@ body {
   margin-top:.5rem;
   margin-bottom:.5rem;
 }
-.spawn-controls img,.image-picker img {width:55px;}
+.spawn-controls img,.image-picker img {width:65px;}
 
 /*
  Spawn controls
@@ -189,15 +213,20 @@ body {
 .spawn-controls {
   position: absolute;
   width:50vw;
-  max-width:390px;
+  max-width:500px;
   font-size:0.9rem;
  
 
   right: 2px;
   bottom: 42px;
-  z-index: 1000;
+  z-index: 1020;
   background: #fff;
 }
+.spawn-controls input {
+    padding:.5rem;
+    font-size:1.1rem;
+}
+
 .spawn-controls div {
   display:block;
   float:left;
@@ -211,4 +240,94 @@ body {
   display:block;
   float:left;
   cursor:pointer;
+}
+
+  .wizard {
+    position:absolute;
+    top:3rem;
+    background:#fff;
+    width: 70vw;
+    max-width:1000px;
+    left: calc(50vw - 500px);
+
+    box-shadow: 4px 4px 5px -3px #444;
+  }
+
+  @media screen and (max-width: 1500px) {
+    .wizard {
+      left: 15vw;
+    }
+  }
+
+  .wizard main,.wizard h1 {
+    padding:2rem;
+    margin-bottom:0;
+  }
+  .wizard h1 {
+    padding-bottom:0;
+  }
+  .wizard p{
+    margin-top:0;
+  }
+  .wizard label {
+    display:block;
+    padding-bottom:.5rem;
+  }
+  .wizard input {
+    padding:.5rem;
+    font-size:1.1rem;
+    width: 60%;
+  }
+  .wizard footer {
+    background:#24c37e;
+    display:flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .wizard footer button {
+    font-size:1.1rem;
+    padding: 1.2rem;
+    border:none;
+    background:auto;
+    background: inherit;
+    cursor:pointer;
+    border-left: solid 1px #95e1c0;
+    color:#fff;
+    padding-right: 2.5rem;
+    position: relative;
+  }
+  .wizard footer button:hover {
+    background: #1a8758;
+  }
+  .wizard hr {
+    border: 0;
+      border-top: solid 1px #eee;
+      margin-bottom:1rem;
+  }
+
+  .wizard footer button:after {
+    content: '\203A';
+    font-size:2.5rem;
+    position: absolute;
+    line-height: 1rem;
+    right: 1rem;
+  }
+
+
+/* quick mobile mode tweaks */
+@media screen and (max-width: 800px) {
+    .app .fog-controls, .spawn-controls {
+        width:100vw;
+        max-width: none;
+    }
+    .app #player-bar {
+        bottom:4rem;
+    }
+    .app #control-bar {
+        display:flex;
+    }
+    .app #control-bar span, .app #control-bar a {
+        flex:1;
+    }
 }

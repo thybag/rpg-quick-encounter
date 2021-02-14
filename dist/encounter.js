@@ -17684,12 +17684,15 @@
 
     var Encounter = Component$1.define({
         initialize: function (config) {
+            // Take control of root
+            this.el = document.querySelector('body');
+            this.el.classList = 'app';
 
             // Get config or load from local storage
             if (window.localStorage) {
                 let restore = window.localStorage.getItem(config.options.map);
-                if (restore /*&& confirm("Save found - restore?")*/){
-                    config.options = JSON.parse(restore);
+                if (restore){
+                   config.options = JSON.parse(restore);
                 } 
             }
 
@@ -17737,49 +17740,157 @@
         }
     });
 
-    // If we are using this direct we take everything from URL.
-    const url = new URLSearchParams(window.location.search);
-    const map = url.get('map');
-    let players = url.get('players');
-
-    // No players, Generate some defaults
-    if (!players) {
-    	players = [
-    		{id: 1, name:'Wizard', icon: null},
-    		{id: 2, name:'Tank', icon: null},
-    		{id: 3, name:'Caster', icon: null},
-    		{id: 4, name:'Healer', icon: null},
-    		{id: 5, name:'Rogue', icon: null}
-    	];
+    async function checkImage(imgPath) {
+      return await new Promise((resolve, reject) => {
+          let img = document.createElement('img');
+          img.src = imgPath;
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+      });
     }
-    // Setup default images if none provided
-    players = parsePlayers(players);
 
-    // Basic setup for standalone
-    const options = {
-    	'container': '#map',
-    	'playerBar': '#player-bar',
-    	'controlBar': '#control-bar',
-    	'map': map,
-    	'players': players,
-    	'spawns': [],
-    	fog: {
-    		enabled: true,
-    		opacity: 70,
-    		clearSize: 36,
-    		mask: ''
-    	}
+    const wizardTpl = function(player) {
+        return tpl(`
+        <h1>Start your new Encounter!</h1>
+        <main>
+            <p>
+                <strong>RPG quick encounter</strong> is an online tool to help you get up and running with your next encounter in moments.
+            </p>
+            <hr>
+            <label>Paste the link to the map you'd like to use</label>
+            <input type='url' name="map" placeholder="https://..." required>
+        </main>
+        <footer>
+            <button class="submit">Start your encounter</button>
+        </footer>
+    `);
     };
 
-    var index$1 = Encounter.make({options});
+    var Wizard = Component$1.define({
+        initialize: function (config) {
+            this.el = wizardTpl();
+            document.body.appendChild(this.el); 
+            this.render();
+        },
+        events: {
+            "click .submit": "startEncounter",
+            "keyup input[name=map]": "detectSubmit"
+        },
+        detectSubmit: function(e){
+            if (e.key =='Enter' || e.keyCode == 13) {
+                this.startEncounter();
+            }
+        },
+        startEncounter: async function() {
+            let mapInput = this.el.querySelector('input[name=map]');  
 
-    function parsePlayers(players) {
+            // Check its a url
+            if (!mapInput.checkValidity()){
+                mapInput.reportValidity();
+                return;
+            }
+
+            // Check its a valid image
+            try {
+                let img = await checkImage(mapInput.value);
+            } catch(e){
+                mapInput.setCustomValidity("URL is not an image or cannot be reached.");
+                mapInput.reportValidity();
+                return;
+            }
+
+            // Send em to the app!
+            window.location = window.location.pathname +'?map=' + mapInput.value;
+            
+        },
+        render: async function () 
+        {
+            this.el.className = 'wizard';  
+        }
+    });
+
+    // Define player defaults
+    const defaultPlayers = [
+    	{id: 1, name:'Wizard', icon: null},
+    	{id: 2, name:'Tank', icon: null},
+    	{id: 3, name:'Caster', icon: null},
+    	{id: 4, name:'Healer', icon: null},
+    	{id: 5, name:'Rogue', icon: null}
+    ];
+
+    // If we are using this direct we take everything from URL.
+    const url = new URLSearchParams(window.location.search);
+    let map = url.get('map');
+    let players = parsePlayerUrl(url.get('players'));
+    let fog$1 = url.get('fog');
+
+    let component = null;
+
+    // Do we have enought?
+    if (!map) {
+    	component = Wizard.make();
+    } else {
+    	// Basic setup for standalone
+    	const options = {
+    		'container': '#map',
+    		'playerBar': '#player-bar',
+    		'controlBar': '#control-bar',
+    		'map': map,
+    		// Setup default images if none provided
+    		'players': configurePlayers(players),
+    		'spawns': [],
+    		fog: {
+    			enabled: !(fog$1 && fog$1 == 'false'),
+    			opacity: 70,
+    			clearSize: 36,
+    			mask: ''
+    		}
+    	};
+    	component = Encounter.make({options});
+    }
+
+    var component$1 = component;
+
+    /**
+     * Get players from player url string
+     * Comma seperated list of players - semicolon can be used to add icon
+     *
+     * players=name,name2,name3
+     * players=name;icon_url,name2;icon_url,name3;icon_url
+     * 
+     * @param  string urlString
+     * @return object
+     */
+    function parsePlayerUrl(urlString) {
+    	// Default players
+    	if (!urlString) return defaultPlayers;
+
+    	// Url provided
+    	return urlString.split(',').map((p) => {
+    		// Any custom icons?
+    		if (p.includes(';')) {
+    			const parts = p.split(';');
+    			return {'name': parts[0], 'icon': parts[1]};
+    		}
+    		return {'name': p};
+    	});
+    }
+
+    /**
+     * Configure player objects
+     * Add missing images & sets standard values
+     * 
+     * @param  {object} players 
+     * @return {object}
+     */
+    function configurePlayers(players) {
 
     	// No point using a smarter algo for 8 elements.
     	let iconList = [1,2,3,4,5,6,7,8];
     	iconList = iconList.sort(() => Math.random() - 0.5);
 
-    	players.map((p, index) => {
+    	// Add icons to anyone missing one
+    	players = players.map((p, index) => {
     		if (!p.icon) {
     			p.icon = `assets/players/${iconList[index]}.png`;
     		}
@@ -17789,6 +17900,6 @@
     	return players;
     }
 
-    return index$1;
+    return component$1;
 
 }());
