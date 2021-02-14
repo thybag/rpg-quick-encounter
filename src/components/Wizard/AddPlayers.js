@@ -60,7 +60,7 @@ export default Component.define({
         let parts = [];
 
         for(let node of this.playerTarget.children) {
-            parts.push(`${node.querySelector('img').src};${node.querySelector('input').value}`);
+            parts.push(`${node.querySelector('input').value};${node.querySelector('img').src}`);
         }
         return '&players='+parts.join(',');
     },
