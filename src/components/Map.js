@@ -55,8 +55,9 @@ export default Component.define({
             event.preventDefault;
             // Going old school for now
             let name = prompt("Rename?", ref.name);
-            console.log(event.target);
-            event.target._icon.querySelector('span').innerText = ref.name = name;
+            if (name) {
+                event.target._icon.querySelector('span').innerText = ref.name = name;
+            }
         });
 
         marker.on('dragend', function(event) {

@@ -14,7 +14,6 @@ export default Component.define({
             let restore = window.localStorage.getItem(config.options.map);
             if (restore /*&& confirm("Save found - restore?")*/){
                 config.options = JSON.parse(restore);
-                console.log(config.options);
             } 
         }
 
@@ -44,18 +43,14 @@ export default Component.define({
 
         // Memory
         props.on('change', (type, prop, newVal) => {
-            console.log(type, prop, newVal);
+            //console.log(type, prop, newVal);
             //console.log("DEBUG:"+type + ' ' + prop, newVal, oldVal);
         });
 
+        // Save local storage
         props.on('updated', () => {
-            //  console.log(props);
-            // console.log(JSON.stringify(props.data));
-            console.log("save");
             window.localStorage.setItem(config.options.map, JSON.stringify(props.data));
         });
-
-
     },
     events: {
 

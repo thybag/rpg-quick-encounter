@@ -66,8 +66,5 @@ export default Component.define({
         } else {
             this.el.style.display = 'none';
         }
-
-        console.log(this.el);
-   
     }
 });

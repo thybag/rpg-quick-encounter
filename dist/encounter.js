@@ -17223,14 +17223,12 @@
         return this.applyFog(cutouts);
       },
       setOpacity: function(opacity){
-        console.log(opacity);
         this.setStyle({'fillOpacity': opacity});
       },
       applyFog: function(cutouts)
       {
         this._latlngs = [this._latlngs[0]];
         cutouts.map((value, index) => {
-          console.log("draw",value);
           this._latlngs[index+1] = this._convertLatLngs(value); 
         });
         return this.redraw();
@@ -17299,8 +17297,9 @@
                 event.preventDefault;
                 // Going old school for now
                 let name = prompt("Rename?", ref.name);
-                console.log(event.target);
-                event.target._icon.querySelector('span').innerText = ref.name = name;
+                if (name) {
+                    event.target._icon.querySelector('span').innerText = ref.name = name;
+                }
             });
 
             marker.on('dragend', function(event) {
@@ -17405,9 +17404,7 @@
 
     function dragSort(elements) {
 
-      console.log(elements);
       Array.from(elements).map(el => {
-        console.log(el);
         el.addEventListener('dragend', dragEnd);
         el.addEventListener('dragstart', dragStart);
         el.addEventListener('dragover', dragOver);
@@ -17541,9 +17538,6 @@
             } else {
                 this.el.style.display = 'none';
             }
-
-            console.log(this.el);
-       
         }
     });
 
@@ -17582,7 +17576,6 @@
             this.prop.visible = true;
             this.parent = parent;
             this.render();
-            console.log("RENDERED");
         },
         select: function(e, item) {
             this.parent.src = item.src;
@@ -17697,7 +17690,6 @@
                 let restore = window.localStorage.getItem(config.options.map);
                 if (restore /*&& confirm("Save found - restore?")*/){
                     config.options = JSON.parse(restore);
-                    console.log(config.options);
                 } 
             }
 
@@ -17727,18 +17719,14 @@
 
             // Memory
             props.on('change', (type, prop, newVal) => {
-                console.log(type, prop, newVal);
+                //console.log(type, prop, newVal);
                 //console.log("DEBUG:"+type + ' ' + prop, newVal, oldVal);
             });
 
+            // Save local storage
             props.on('updated', () => {
-                //  console.log(props);
-                // console.log(JSON.stringify(props.data));
-                console.log("save");
                 window.localStorage.setItem(config.options.map, JSON.stringify(props.data));
             });
-
-
         },
         events: {
 
@@ -17754,7 +17742,7 @@
     const map = url.get('map');
     let players = url.get('players');
 
-
+    // No players, Generate some defaults
     if (!players) {
     	players = [
     		{id: 1, name:'Wizard', icon: null},
@@ -17764,9 +17752,10 @@
     		{id: 5, name:'Rogue', icon: null}
     	];
     }
-
+    // Setup default images if none provided
     players = parsePlayers(players);
 
+    // Basic setup for standalone
     const options = {
     	'container': '#map',
     	'playerBar': '#player-bar',
@@ -17790,7 +17779,7 @@
     	let iconList = [1,2,3,4,5,6,7,8];
     	iconList = iconList.sort(() => Math.random() - 0.5);
 
-    	players.forEach( (p, index) => {
+    	players.map((p, index) => {
     		if (!p.icon) {
     			p.icon = `assets/players/${iconList[index]}.png`;
     		}

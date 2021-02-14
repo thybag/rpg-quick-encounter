@@ -1,4 +1,4 @@
-import Encounter from './encounter.js';
+import Encounter from './Encounter.js';
 
 // I still don't really get why rollup and similar tools now
 // want people to include css files in the js itself, vs just giving styles
@@ -11,7 +11,7 @@ const url = new URLSearchParams(window.location.search);
 const map = url.get('map');
 let players = url.get('players');
 
-
+// No players, Generate some defaults
 if (!players) {
 	players = [
 		{id: 1, name:'Wizard', icon: null},
@@ -21,9 +21,10 @@ if (!players) {
 		{id: 5, name:'Rogue', icon: null}
 	];
 }
-
+// Setup default images if none provided
 players = parsePlayers(players);
 
+// Basic setup for standalone
 const options = {
 	'container': '#map',
 	'playerBar': '#player-bar',
@@ -47,7 +48,7 @@ function parsePlayers(players) {
 	let iconList = [1,2,3,4,5,6,7,8];
 	iconList = iconList.sort(() => Math.random() - 0.5)
 
-	players.forEach( (p, index) => {
+	players.map((p, index) => {
 		if (!p.icon) {
 			p.icon = `assets/players/${iconList[index]}.png`;
 		}

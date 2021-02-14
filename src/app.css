@@ -70,24 +70,23 @@ body {
   text-align:center;
 }
 
-#control-bar span {
+#control-bar span, #control-bar a {
 	display:inline-block;
 	float:right;
 	color:#fff;
 	text-align:center;
-
+  text-decoration: none;
 	padding: 8px 40px;
-    border-left: solid 1px #95e1c0;
-    margin-top:1px;
-    cursor:pointer;
+  border-left: solid 1px #95e1c0;
+  margin-top:1px;
+  cursor:pointer;
 
 }
-#control-bar span:hover {
+#control-bar span:hover, #control-bar a:hover {
 	background:#1a8758;
 }
 
 /* fog controls */
-
 .fog-controls {
 	display:flex;
 	position: absolute;

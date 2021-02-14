@@ -30,9 +30,7 @@ function isBefore(el1, el2) {
 
 export default function(elements) {
 
-  console.log(elements);
   Array.from(elements).map(el => {
-    console.log(el);
     el.addEventListener('dragend', dragEnd);
     el.addEventListener('dragstart', dragStart);
     el.addEventListener('dragover', dragOver);

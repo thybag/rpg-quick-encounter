@@ -1,30 +1,35 @@
-A simple on-line "encounter" webapp for running RPG game encounters remotely.
+# Quick RPG Encounters.
 
-Just add the URL to the encounter map you'd like to use, add your players, setup an enimys are your good to go!.
+Super simple on-line "encounter" tool for roll playing games. Get set up with any map in seconds.
+
+Try it here (no logins needed):
 [URL HERE]
 
-#### Controls.
-FogOfWar: Left click to clear an area, right click to cover it. You can change the clear size and fog opacity in the Fog menu.
-Players: Click a player to spawn them, then just drag them around as need be.
-Player bar can be drag/drop reordered.
+**Grab a map** To start, grab a map image you'd like to use. Plenty of great ones are shared on https://www.reddit.com/r/dndmaps/
 
-#### Features
-* Super quick to setup, 
-* no login/sign-up or anything else, just add your map and off you go.
-* Optional fog of war to hide/obscure things from your players.
-* Ability to quickly add NPCs/Enemy's as needed
-* Setup your players and arrange them in turn order.
+#### How to use it
+**Players:** Click a player to spawn them on the map, then drag them around as need be. Double click to rename.
+**Spawn NPC's:** Just select name/image from spawn menu and drag them as need be.
+**Fog:** click to clear an area of fog, right click to re-add it. You can control fog opacity, clearing size or just turn it off in the fog menu.
+**Auto save:** every action is saved to your local storage so you can quickly resume a game at your leisure.
+**Player bar** Click a player to spawn or focus on them & reorder freely to match turn order.
 
-#### Planned:
-* Use local storage to keep track of everything so you can easily go away and come back to an encounter
-* Import/Export features
-* Drag/drop map setup.
+#### Planned features
+* Better getting started wizard
+* Import/Export - so people can share reconfigured encounters or just move them around.
+* Ability Drag/drop  local maps and images, rather than needing to hotlink them.
+* Custom NPC/player/monster icons
+* Ability to add overlays for injured or dead NPC's.
+* Proper dialogs - currently I'm slumming it with conform/prompts.
 
 ## Credits;
 Released by Carl Saggs under the MIT license.
 
 Made possible by the great work in;
-* Leaflet.js
-* Rollup.js
-* turf.js
-* Kenny's awesome free assets. https://www.kenney.nl/
+
+* [Leaflet.js](https://leafletjs.com/) - Powering the maps themselves
+* [Rollup.js](https://rollupjs.org/) - Build tooling
+* [turf.js](https://turfjs.org/) - Clever GeoJson tools.
+* [Kenny's](https://www.kenney.nl/) awesome free assets. 
+* [Lump.js](https://github.com/thybag/lump.js) - Because this is a hobby project, so why not attempt to roll my own js framework.
+* Github - for hosting

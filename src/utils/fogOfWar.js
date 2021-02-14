@@ -31,14 +31,12 @@ L.Fog = L.Rectangle.extend({
     return this.applyFog(cutouts);
   },
   setOpacity: function(opacity){
-    console.log(opacity);
     this.setStyle({'fillOpacity': opacity});
   },
   applyFog: function(cutouts)
   {
     this._latlngs = [this._latlngs[0]];
     cutouts.map((value, index) => {
-      console.log("draw",value);
       this._latlngs[index+1] = this._convertLatLngs(value); 
     });
     return this.redraw();

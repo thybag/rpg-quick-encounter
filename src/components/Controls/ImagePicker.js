@@ -36,7 +36,6 @@ export default Component.define({
         this.prop.visible = true;
         this.parent = parent;
         this.render();
-        console.log("RENDERED");
     },
     select: function(e, item) {
         this.parent.src = item.src;
