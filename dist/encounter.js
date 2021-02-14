@@ -17304,7 +17304,6 @@
 
             marker.on('dragend', function(event) {
                 const latLng = event.target.getLatLng();
-
                 // Sync
                 event.target.options.ref.x = latLng.lat;
                 event.target.options.ref.y = latLng.lng;
@@ -17728,6 +17727,7 @@
 
             // Save local storage
             props.on('updated', () => {
+                //console.log("saved");
                 window.localStorage.setItem(config.options.map, JSON.stringify(props.data));
             });
         },
@@ -18052,7 +18052,7 @@
     		if (!p.icon) {
     			p.icon = `assets/players/${iconList[index]}.png`;
     		}
-    		return {id: index, name: p.name, icon: p.icon, spawned: false, x: null, y:null};
+    		return {id: index, name: p.name, icon: p.icon, spawned: false, x:0, y:0};
     	});
     	
     	return players;

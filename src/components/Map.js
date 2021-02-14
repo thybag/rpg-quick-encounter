@@ -62,7 +62,6 @@ export default Component.define({
 
         marker.on('dragend', function(event) {
             const latLng = event.target.getLatLng();
-
             // Sync
             event.target.options.ref.x = latLng.lat;
             event.target.options.ref.y = latLng.lng;

@@ -51,6 +51,7 @@ export default Component.define({
 
         // Save local storage
         props.on('updated', () => {
+            //console.log("saved");
             window.localStorage.setItem(config.options.map, JSON.stringify(props.data));
         });
     },

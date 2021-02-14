@@ -90,7 +90,7 @@ function configurePlayers(players) {
 		if (!p.icon) {
 			p.icon = `assets/players/${iconList[index]}.png`;
 		}
-		return {id: index, name: p.name, icon: p.icon, spawned: false, x: null, y:null};
+		return {id: index, name: p.name, icon: p.icon, spawned: false, x:0, y:0};
 	});
 	
 	return players;
