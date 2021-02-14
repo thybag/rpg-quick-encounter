@@ -212,8 +212,8 @@ input[type='submit']:hover {
  */
 .spawn-controls {
   position: absolute;
-  width:50vw;
-  max-width:500px;
+  width:500px;
+  max-width:100vw;
   font-size:0.9rem;
  
 
@@ -320,7 +320,13 @@ input[type='submit']:hover {
     .app .fog-controls, .spawn-controls {
         width:100vw;
         max-width: none;
+        right:0;
+        bottom:40px;
     }
+    .spawn-controls input {
+        max-width: 40vw;;
+    }
+    
     .app #player-bar {
         bottom:4rem;
     }
