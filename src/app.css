@@ -21,7 +21,7 @@ body {
 }
 #player-bar {
     position: absolute;
-    bottom:1rem;
+    bottom:2rem;
     left:1rem;
     z-index:9999;
     height:85px;
@@ -36,6 +36,13 @@ body {
     cursor:pointer;
 }
 
+#player-bar div span {
+  text-overflow: ellipsis;
+  height: 1.4rem;
+  overflow: hidden;
+  display: inline-block;
+}
+
 #player-bar div img {
     pointer-events: none;
     width:100%;
@@ -47,13 +54,20 @@ body {
 
 
 .character-icon {
-    width: 55px;
-    padding:.1rem;
-    background:#fff;
-    margin:2px;
+    position:relative;
 }
 .character-icon img {
 	width:100%;
+  padding:0.2rem;
+  margin-bottom: -6px;
+  box-sizing: border-box;
+}
+.character-icon span {
+  display: block;
+  padding: .1rem 0;
+  background: #fff;
+  border: solid 2px;
+  text-align:center;
 }
 
 #control-bar span {
@@ -197,4 +211,5 @@ body {
   padding:1rem;
   display:block;
   float:left;
+  cursor:pointer;
 }

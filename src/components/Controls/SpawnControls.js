@@ -9,7 +9,7 @@ const controlTpl = function() {
         <div>
             <label>Name</label>
             <input type="text" value="Unknown">
-            <input type='submit'>
+            <input type='submit' value="Spawn">
         </div>
         
     `);

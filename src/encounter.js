@@ -12,7 +12,7 @@ export default Component.define({
         // Get config or load from local storage
         if (window.localStorage) {
             let restore = window.localStorage.getItem(config.options.map);
-            if (restore && confirm("Save found - restore?")){
+            if (restore /*&& confirm("Save found - restore?")*/){
                 config.options = JSON.parse(restore);
                 console.log(config.options);
             } 
@@ -21,10 +21,11 @@ export default Component.define({
         // Set global state
         const props = new Model(config.options);
         
-        const map = EncounterMap.make({options: props.data});
-        const players = Players.make({options: props.data});
-        const controls = Controls.make({options: props.data});
+        const map = EncounterMap.make({options: props.data, bus: props});
+        const players = Players.make({options: props.data, bus: props});
+        const controls = Controls.make({options: props.data, bus: props});
 
+        // Pass model eventing
         map.listenTo(props);
 
         players.on('map:player:spawn', function(player) {
@@ -43,7 +44,7 @@ export default Component.define({
 
         // Memory
         props.on('change', (type, prop, newVal) => {
-            //console.log(type, prop, newVal);
+            console.log(type, prop, newVal);
             //console.log("DEBUG:"+type + ' ' + prop, newVal, oldVal);
         });
 

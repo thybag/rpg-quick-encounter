@@ -7,7 +7,7 @@ const playerMap = new WeakMap();
 const playerTpl = function(player) {
     const template = tpl(`
         <img src="${player.icon}">
-        ${player.name}
+        <span>${player.name}</span>
     `);
     playerMap.set(template, player);
     return template;
@@ -39,9 +39,15 @@ export default Component.define({
     },
     render: async function () 
     {
-        this.options.players.map(player => {
+        this.options.players.map((player, index) => {
             let playerToken = playerTpl(player);
             if (player.spawned) playerToken.classList.add('spawned');
+
+            // Listen for name changes
+            this.bus.on(`update:players.${index}.name`, (newName) => {
+                playerToken.querySelector('span').innerText = newName;
+            });
+
             this.el.appendChild(playerToken);
         });
 

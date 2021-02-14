@@ -17140,9 +17140,30 @@
             return multiPolygon(unioned, options.properties);
     }
 
+    function mployToPairs(mpoly) {
+      return mpoly.map((poly) => {
+        if (poly.lat) return [poly.lat, poly.lng];
+
+        return mployToPairs(poly);
+      });
+    }
+
     // Keep track of cut out sections
     var fog = new function() {
       this.cutouts = null;
+
+      this.loadCutOuts = function(multipolys) {
+        // Load cutouts from restore.
+        // 
+        // This data is the drawn multipoly of the leaflet mask
+        // so we need to strip off the outer mask (as we don't deal with
+        // that here) and the convert the poly or multipolys from leaflet
+        // latLngs to [lat,lng] pairs.
+        multipolys.shift();
+        this.cutouts = mployToPairs(multipolys);
+
+        return this.cutouts;
+      };
 
       this.addCutOut = function(poly) {
         if (!this.cutouts) {
@@ -17164,8 +17185,12 @@
 
         let u = difference$1(cutoutPoly, newPoly);
 
-        this.cutouts = u.geometry.coordinates;
-        return this.cutouts;
+        // Handle null if no difference found (ie. we cleared it all)
+        if (!u) {
+          return this.cutouts = [];
+        }
+
+        return this.cutouts = u.geometry.coordinates;
       };
     };
 
@@ -17178,6 +17203,11 @@
       },
       initialize: function (bounds, options) {
         leafletSrc.Polygon.prototype.initialize.call(this, [this._boundsToLatLngs(bounds)], options);       
+      },
+      initFog: function(mask) {
+        // Load mask back to fog format & apply it from reload
+        const newFog = fog.loadCutOuts(mask);
+        this.applyFog(newFog);
       },
       clearFog: function (latLng, size = 36) {
         // Get area Poly
@@ -17200,6 +17230,7 @@
       {
         this._latlngs = [this._latlngs[0]];
         cutouts.map((value, index) => {
+          console.log("draw",value);
           this._latlngs[index+1] = this._convertLatLngs(value); 
         });
         return this.redraw();
@@ -17244,7 +17275,7 @@
             const icon = L.divIcon({
                 className: 'character-icon',
                 html: `<img src='${img}'><span>${name}</span>`,
-                iconSize:     [55, 70],
+                iconSize:     [60, 80],
                 iconAnchor:   [35, 35],
             });
 
@@ -17259,6 +17290,19 @@
                 }
             ).addTo(this.map);
 
+            marker.on('click', function(event) {
+                event.preventDefault;
+                console.log("click me");
+            });
+
+            marker.on('dblclick', function(event) {
+                event.preventDefault;
+                // Going old school for now
+                let name = prompt("Rename?", ref.name);
+                console.log(event.target);
+                event.target._icon.querySelector('span').innerText = ref.name = name;
+            });
+
             marker.on('dragend', function(event) {
                 const latLng = event.target.getLatLng();
 
@@ -17270,8 +17314,6 @@
             return marker;
         },
         focusPlayer: function(player) {
-            console.log("focus", playerToIconMap[player.id]);
-
             this.map.panTo(playerToIconMap[player.id].getLatLng());
         },
         fogToggled: function(newValue) {
@@ -17291,24 +17333,6 @@
             this.map = await createMap('map', this.options.map);
             this.fog = fogOfWar(this.map);
 
-            // Load config from settings
-            if (!this.options.fog.mask){
-                this.options.fog.mask = JSON.stringify(this.fog.getLatLngs());
-            }
-            this.fog.setLatLngs(JSON.parse(this.options.fog.mask));
-            this.fogToggled(this.options.fog.enabled);
-            this.fogOpacityChanged(this.options.fog.opacity);
-
-            // Boot players
-            for (const player of Object.values(this.options.players)) {
-                if (player.spawned) {
-                    this.trigger('map:player:spawn', player);
-                }
-            }
-            // Boot spawns
-            for (const spawn of Object.values(this.options.spawns)) {
-                this.trigger('map:spawn', spawn);
-            }
 
             this.map.on('click', e => { 
                 if (!this.options.fog.enabled) return;
@@ -17322,6 +17346,30 @@
                 this.fog.addFog(e.latlng, this.options.fog.clearSize); 
                 this.options.fog.mask = JSON.stringify(this.fog.getLatLngs());
             });
+
+            // Reload save data
+            // Load config from settings
+            if (!this.options.fog.mask){
+                this.options.fog.mask = JSON.stringify(this.fog.getLatLngs());
+            } else {
+                this.fog.initFog(JSON.parse(this.options.fog.mask));
+            }
+
+            this.fogOpacityChanged(this.options.fog.opacity);
+            this.fogToggled(this.options.fog.enabled);
+
+            // Boot players
+            for (const player of Object.values(this.options.players)) {
+                if (player.spawned) {
+                    this.trigger('map:player:spawn', player);
+                }
+            }
+            // Boot spawns
+            for (const spawn of Object.values(this.options.spawns)) {
+                this.trigger('map:spawn', spawn);
+            }
+
+
         }
     });
 
@@ -17379,7 +17427,7 @@
     const playerTpl = function(player) {
         const template = tpl(`
         <img src="${player.icon}">
-        ${player.name}
+        <span>${player.name}</span>
     `);
         playerMap.set(template, player);
         return template;
@@ -17411,9 +17459,15 @@
         },
         render: async function () 
         {
-            this.options.players.map(player => {
+            this.options.players.map((player, index) => {
                 let playerToken = playerTpl(player);
                 if (player.spawned) playerToken.classList.add('spawned');
+
+                // Listen for name changes
+                this.bus.on(`update:players.${index}.name`, (newName) => {
+                    playerToken.querySelector('span').innerText = newName;
+                });
+
                 this.el.appendChild(playerToken);
             });
 
@@ -17554,7 +17608,7 @@
         <div>
             <label>Name</label>
             <input type="text" value="Unknown">
-            <input type='submit'>
+            <input type='submit' value="Spawn">
         </div>
         
     `);
@@ -17641,7 +17695,7 @@
             // Get config or load from local storage
             if (window.localStorage) {
                 let restore = window.localStorage.getItem(config.options.map);
-                if (restore && confirm("Save found - restore?")){
+                if (restore /*&& confirm("Save found - restore?")*/){
                     config.options = JSON.parse(restore);
                     console.log(config.options);
                 } 
@@ -17650,10 +17704,11 @@
             // Set global state
             const props = new Model(config.options);
             
-            const map = EncounterMap.make({options: props.data});
-            const players = Players.make({options: props.data});
-            const controls = Controls.make({options: props.data});
+            const map = EncounterMap.make({options: props.data, bus: props});
+            const players = Players.make({options: props.data, bus: props});
+            const controls = Controls.make({options: props.data, bus: props});
 
+            // Pass model eventing
             map.listenTo(props);
 
             players.on('map:player:spawn', function(player) {
@@ -17672,7 +17727,7 @@
 
             // Memory
             props.on('change', (type, prop, newVal) => {
-                //console.log(type, prop, newVal);
+                console.log(type, prop, newVal);
                 //console.log("DEBUG:"+type + ' ' + prop, newVal, oldVal);
             });
 

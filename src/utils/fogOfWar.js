@@ -12,6 +12,11 @@ L.Fog = L.Rectangle.extend({
   initialize: function (bounds, options) {
     L.Polygon.prototype.initialize.call(this, [this._boundsToLatLngs(bounds)], options);       
   },
+  initFog: function(mask) {
+    // Load mask back to fog format & apply it from reload
+    const newFog = fog.loadCutOuts(mask);
+    this.applyFog(newFog);
+  },
   clearFog: function (latLng, size = 36) {
     // Get area Poly
     const areaPoly = circleToPolygon([latLng.lat, latLng.lng], size);
@@ -33,6 +38,7 @@ L.Fog = L.Rectangle.extend({
   {
     this._latlngs = [this._latlngs[0]];
     cutouts.map((value, index) => {
+      console.log("draw",value);
       this._latlngs[index+1] = this._convertLatLngs(value); 
     });
     return this.redraw();

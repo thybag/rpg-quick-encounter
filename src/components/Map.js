@@ -31,7 +31,7 @@ export default Component.define({
         const icon = L.divIcon({
             className: 'character-icon',
             html: `<img src='${img}'><span>${name}</span>`,
-            iconSize:     [55, 70],
+            iconSize:     [60, 80],
             iconAnchor:   [35, 35],
         });
 
@@ -46,6 +46,19 @@ export default Component.define({
             }
         ).addTo(this.map);
 
+        marker.on('click', function(event) {
+            event.preventDefault;
+            console.log("click me");
+        });
+
+        marker.on('dblclick', function(event) {
+            event.preventDefault;
+            // Going old school for now
+            let name = prompt("Rename?", ref.name);
+            console.log(event.target);
+            event.target._icon.querySelector('span').innerText = ref.name = name;
+        });
+
         marker.on('dragend', function(event) {
             const latLng = event.target.getLatLng();
 
@@ -57,8 +70,6 @@ export default Component.define({
         return marker;
     },
     focusPlayer: function(player) {
-        console.log("focus", playerToIconMap[player.id]);
-
         this.map.panTo(playerToIconMap[player.id].getLatLng());
     },
     fogToggled: function(newValue) {
@@ -78,24 +89,6 @@ export default Component.define({
         this.map = await createMap('map', this.options.map);
         this.fog = fogOfWar(this.map);
 
-        // Load config from settings
-        if (!this.options.fog.mask){
-            this.options.fog.mask = JSON.stringify(this.fog.getLatLngs());
-        }
-        this.fog.setLatLngs(JSON.parse(this.options.fog.mask));
-        this.fogToggled(this.options.fog.enabled);
-        this.fogOpacityChanged(this.options.fog.opacity);
-
-        // Boot players
-        for (const player of Object.values(this.options.players)) {
-            if (player.spawned) {
-                this.trigger('map:player:spawn', player);
-            }
-        }
-        // Boot spawns
-        for (const spawn of Object.values(this.options.spawns)) {
-            this.trigger('map:spawn', spawn);
-        }
 
         this.map.on('click', e => { 
             if (!this.options.fog.enabled) return;
@@ -109,5 +102,29 @@ export default Component.define({
             this.fog.addFog(e.latlng, this.options.fog.clearSize); 
             this.options.fog.mask = JSON.stringify(this.fog.getLatLngs());
         });
+
+        // Reload save data
+        // Load config from settings
+        if (!this.options.fog.mask){
+            this.options.fog.mask = JSON.stringify(this.fog.getLatLngs());
+        } else {
+            this.fog.initFog(JSON.parse(this.options.fog.mask));
+        }
+
+        this.fogOpacityChanged(this.options.fog.opacity);
+        this.fogToggled(this.options.fog.enabled);
+
+        // Boot players
+        for (const player of Object.values(this.options.players)) {
+            if (player.spawned) {
+                this.trigger('map:player:spawn', player);
+            }
+        }
+        // Boot spawns
+        for (const spawn of Object.values(this.options.spawns)) {
+            this.trigger('map:spawn', spawn);
+        }
+
+
     }
 });
