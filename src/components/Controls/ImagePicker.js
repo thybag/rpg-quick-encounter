@@ -6,7 +6,7 @@ const controlTpl = function() {
     for(let i=1;i<=8;i++){
        NPCList += `<img src="assets/players/${i}.png">`;
     }
-    for(let i=1;i<=30;i++){
+    for(let i=1;i<=33;i++){
        MonsterList += `<img src="assets/monsters/${i}.png">`;
     }
 

@@ -1,6 +1,6 @@
 # Quick RPG Encounters.
 
-Super simple on-line "encounter" tool for roll playing games. Get set up with any map in seconds.
+Super simple on-line "encounter" tool for role playing games. Get set up with any map in seconds.
 
 Try it here (no logins needed):    
 https://thybag.github.io/rpg-quick-encounter/
