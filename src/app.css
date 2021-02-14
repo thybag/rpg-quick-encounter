@@ -4,20 +4,20 @@ body {
 	font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol;
 	font-size: 16px;
 	overflow: hidden;
-  background:#ccc;
+    background:#ccc;
 }
 
 input {
     padding: .5rem;
     font-size: 1.1rem;
 }
-input[type='submit'] {
+input[type='submit'], button {
     border-radius:0;
     cursor:pointer;
     border:solid 1px #24c37e;
     background:#24c37e;
     color:#fff;
-    apperi
+    padding:.5rem;
 }
 input[type='submit']:hover {
     background:#1a8758;
@@ -200,6 +200,7 @@ input[type='submit']:hover {
   width: 50vw;
   left: 25vw;
   padding: 1rem;
+  border: solid 3px #000;
 }
 .image-picker div {
   margin-top:.5rem;
@@ -314,6 +315,68 @@ input[type='submit']:hover {
     right: 1rem;
   }
 
+    .wizard .more {
+        display: block;
+        margin: 1rem 0;
+        color: #bbb;
+        text-align: center;
+        margin-top:2rem;
+        cursor: pointer;
+    }
+    .wizard .advanced {
+        max-height:0;
+        overflow: auto;
+        transition: .3s max-height;
+    }
+    .wizard .advanced.show {
+        max-height:600px;
+    }
+    .wizard .advanced input {
+        width:40%;
+    }
+    .wizard .advanced h2 {margin-top:0;}
+
+    .wizard .player-option {
+        margin-bottom: 1rem;
+    }
+    .wizard .player-option span.icon {
+        margin-right:1rem;
+        float:left;
+        width:60px;
+    }
+    .wizard .player-option span.icon img {
+        height: 55px;
+        cursor:pointer;
+    }
+    .wizard .player-option span.remove {
+        cursor:pointer;
+    }
+        
+    .wizard .player-option input {
+        margin-top: .5rem;
+    }
+
+    .wizard .more:after { 
+        content: '';
+        /*
+        border-top: solid 1px #eee;
+        display: block;
+        margin-top: -8px;
+        */
+        height: 12px;
+        display: block;
+        width: 110px;
+        background:#fff;
+        margin:auto;
+        margin-top: -14px;
+    }
+    .wizard .more:before { 
+        content: '';
+        border-top: solid 1px #eee;
+        display: block;
+        margin-bottom:-12px;
+
+    }   
 
 /* quick mobile mode tweaks */
 @media screen and (max-width: 800px) {

@@ -17551,10 +17551,10 @@
         }
 
         return tpl(`
+         <div>NPCs/Players</div>
+            ${NPCList}
         <div>Monsters</div>
             ${MonsterList}
-        <div>NPCs</div>
-            ${NPCList}
     `);
     };
 
@@ -17740,6 +17740,145 @@
         }
     });
 
+    // Icon list
+    let iconList = [1,2,3,4,5,6,7,8];
+
+    const getRandomIconId = function() {
+    	return Math.floor((Math.random() * iconList.length) + 1)
+    };
+
+    const getRandomIconIdList = function() {
+    	// No point using a smarter algo for 8 elements.
+    	return iconList.sort(() => Math.random() - 0.5);
+    };
+
+    const getRandomIconLink = function() {
+    	return `assets/players/${getRandomIconId()}.png`
+    };
+
+    const getRandomIconLinksList = function() {
+    	return getRandomIconIdList().map((v) => `assets/players/${v}.png`);
+    };
+
+    const controlTpl$3 = function() {
+        let NPCList = '',MonsterList= '';
+        for(let i=1;i<=8;i++){
+           NPCList += `<img src="assets/players/${i}.png">`;
+        }
+        for(let i=1;i<=33;i++){
+           MonsterList += `<img src="assets/monsters/${i}.png">`;
+        }
+
+        return tpl(`
+         <div>NPCs/Players</div>
+            ${NPCList}
+        <div>Monsters</div>
+            ${MonsterList}
+    `);
+    };
+
+    var ImagePicker$1 = Component$1.define({
+        initialize: function (options) {
+            this.el = controlTpl$3();
+            this.el.className = 'image-picker';
+            this.el.style.display = 'none';
+            document.body.appendChild(this.el);
+        },
+        parent: null,
+        prop: {
+            visible: false,
+        },
+        events: {
+            "click img": "select",
+        },
+        open: function(parent) {
+            this.prop.visible = true;
+            this.parent = parent;
+            this.render();
+        },
+        select: function(e, item) {
+            this.parent.src = item.src;
+
+            this.parent = null;
+            this.prop.visible = false;
+            this.render();
+        },
+        render: async function () 
+        {
+            if (this.prop.visible){
+                this.el.style.display = 'block';
+            } else {
+                this.el.style.display = 'none';
+            }
+        }
+    });
+
+    const wizardPlayersTpl = function(player) {
+        return tpl(`
+        <h2>Players</h2>
+        <div></div>
+        <button>Add another player</button>
+    `);
+    };
+
+    const playerTpl$1 = function(name, icon) {
+        return tpl(`
+        <span class="icon"><img src="${icon}"></span>
+        <input type='text' name="name" value="${name}">
+        <span class="remove">X</span>
+    `, 'player-option');
+    };
+
+    const defaultPlayers = ['Caster', 'Tank', 'Rogue', 'Healer', 'Wizard'];
+
+    var AddPlayers = Component$1.define({
+        playerTarget: null,
+        initialize: function (config) {
+            this.el = wizardPlayersTpl();
+            this.picker = null;
+
+            const icons = getRandomIconLinksList();
+            this.playerTarget = this.el.querySelector('div');
+
+            defaultPlayers.forEach((p, idx) => {
+                this.createPlayerRow(p, icons[idx]);
+            });
+        },
+        events: {
+            'click img': 'openPickList',
+            'click button': 'addPlayer',
+            'click .remove': 'removePlayer'
+        },
+        addPlayer: function() {
+            this.createPlayerRow();
+        },
+        removePlayer: function(e, target) {
+            target.parentNode.remove();
+        },
+        createPlayerRow: function(name ='', icon=null) {
+            if (!icon) icon = getRandomIconLink();
+
+            const nPlayer = playerTpl$1(name, icon);
+            this.playerTarget.appendChild(nPlayer);
+        },
+        openPickList: function(e, target){
+            if(!this.picker) this.picker = ImagePicker$1.make();
+            this.picker.open(target);
+        },
+        toUrlString: function() {
+            let parts = [];
+
+            for(let node of this.playerTarget.children) {
+                parts.push(`${node.querySelector('img').src};${node.querySelector('input').value}`);
+            }
+            return '&players='+parts.join(',');
+        },
+        render: async function () 
+        {
+            this.el.className = 'wizard';  
+        }
+    });
+
     async function checkImage(imgPath) {
       return await new Promise((resolve, reject) => {
           let img = document.createElement('img');
@@ -17757,8 +17896,14 @@
                 <strong>RPG quick encounter</strong> is an online tool to help you get up and running with your next encounter in moments.
             </p>
             <hr>
+
             <label>Paste the link to the map you'd like to use</label>
             <input type='url' name="map" placeholder="https://..." required>
+            
+            <span class='more'>More options</span>
+            <div class="advanced">
+               
+            </div>
         </main>
         <footer>
             <button class="submit">Start your encounter</button>
@@ -17772,9 +17917,18 @@
             document.body.appendChild(this.el); 
             this.render();
         },
+        playersComponent: null,
         events: {
             "click .submit": "startEncounter",
-            "keyup input[name=map]": "detectSubmit"
+            "keyup input[name=map]": "detectSubmit",
+            "click .more": "showMore"
+        },
+        showMore: function() {
+            if(!this.playersComponent) {
+                this.playersComponent = AddPlayers.make();
+                this.el.querySelector('.advanced').appendChild(this.playersComponent.el);
+            }
+            this.el.querySelector('.advanced').classList.toggle('show');
         },
         detectSubmit: function(e){
             if (e.key =='Enter' || e.keyCode == 13) {
@@ -17797,10 +17951,17 @@
                 mapInput.setCustomValidity("URL is not an image or cannot be reached.");
                 mapInput.reportValidity();
                 return;
+            } 
+
+            let path = window.location.pathname +'?map=' + mapInput.value;
+
+            if (this.playersComponent && this.el.querySelector('.advanced').classList.contains('show')) {
+                console.log(this.playersComponent);
+                path += this.playersComponent.toUrlString();
             }
 
             // Send em to the app!
-            window.location = window.location.pathname +'?map=' + mapInput.value;
+            window.location = path;
             
         },
         render: async function () 
@@ -17810,7 +17971,7 @@
     });
 
     // Define player defaults
-    const defaultPlayers = [
+    const defaultPlayers$1 = [
     	{id: 1, name:'Wizard', icon: null},
     	{id: 2, name:'Tank', icon: null},
     	{id: 3, name:'Caster', icon: null},
@@ -17863,7 +18024,7 @@
      */
     function parsePlayerUrl(urlString) {
     	// Default players
-    	if (!urlString) return defaultPlayers;
+    	if (!urlString) return defaultPlayers$1;
 
     	// Url provided
     	return urlString.split(',').map((p) => {
@@ -17885,10 +18046,7 @@
      */
     function configurePlayers(players) {
 
-    	// No point using a smarter algo for 8 elements.
-    	let iconList = [1,2,3,4,5,6,7,8];
-    	iconList = iconList.sort(() => Math.random() - 0.5);
-
+    	const iconList = getRandomIconIdList();
     	// Add icons to anyone missing one
     	players = players.map((p, index) => {
     		if (!p.icon) {

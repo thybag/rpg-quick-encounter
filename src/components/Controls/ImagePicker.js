@@ -11,10 +11,10 @@ const controlTpl = function() {
     }
 
     return tpl(`
+         <div>NPCs/Players</div>
+            ${NPCList}
         <div>Monsters</div>
             ${MonsterList}
-        <div>NPCs</div>
-            ${NPCList}
     `);
 }
 

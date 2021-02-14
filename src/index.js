@@ -1,5 +1,6 @@
 import Encounter from './Encounter.js';
 import Wizard from './components/Wizard.js';
+import getRandomPlayerIcons from './utils/getRandomPlayerIcons.js';
 
 // I still don't really get why rollup and similar tools now
 // want people to include css files in the js itself, vs just giving styles
@@ -83,10 +84,7 @@ function parsePlayerUrl(urlString) {
  */
 function configurePlayers(players) {
 
-	// No point using a smarter algo for 8 elements.
-	let iconList = [1,2,3,4,5,6,7,8];
-	iconList = iconList.sort(() => Math.random() - 0.5)
-
+	const iconList = getRandomPlayerIcons();
 	// Add icons to anyone missing one
 	players = players.map((p, index) => {
 		if (!p.icon) {

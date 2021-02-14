@@ -1,6 +1,9 @@
 import Component from 'lumpjs/src/component.js';
-import tpl from '../utils/tpl.js'
+import AddPlayers from './Wizard/AddPlayers.js'
+
+// utils
 import checkImage from '../utils/checkImage.js'
+import tpl from '../utils/tpl.js'
 
 const wizardTpl = function(player) {
     return tpl(`
@@ -10,8 +13,14 @@ const wizardTpl = function(player) {
                 <strong>RPG quick encounter</strong> is an online tool to help you get up and running with your next encounter in moments.
             </p>
             <hr>
+
             <label>Paste the link to the map you'd like to use</label>
             <input type='url' name="map" placeholder="https://..." required>
+            
+            <span class='more'>More options</span>
+            <div class="advanced">
+               
+            </div>
         </main>
         <footer>
             <button class="submit">Start your encounter</button>
@@ -25,9 +34,18 @@ export default Component.define({
         document.body.appendChild(this.el); 
         this.render();
     },
+    playersComponent: null,
     events: {
         "click .submit": "startEncounter",
-        "keyup input[name=map]": "detectSubmit"
+        "keyup input[name=map]": "detectSubmit",
+        "click .more": "showMore"
+    },
+    showMore: function() {
+        if(!this.playersComponent) {
+            this.playersComponent = AddPlayers.make();
+            this.el.querySelector('.advanced').appendChild(this.playersComponent.el);
+        }
+        this.el.querySelector('.advanced').classList.toggle('show');
     },
     detectSubmit: function(e){
         if (e.key =='Enter' || e.keyCode == 13) {
@@ -50,10 +68,17 @@ export default Component.define({
             mapInput.setCustomValidity("URL is not an image or cannot be reached.");
             mapInput.reportValidity();
             return;
+        } 
+
+        let path = window.location.pathname +'?map=' + mapInput.value;
+
+        if (this.playersComponent && this.el.querySelector('.advanced').classList.contains('show')) {
+            console.log(this.playersComponent);
+            path += this.playersComponent.toUrlString();
         }
 
         // Send em to the app!
-        window.location = window.location.pathname +'?map=' + mapInput.value;
+        window.location = path;
         
     },
     render: async function () 
