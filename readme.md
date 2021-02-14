@@ -3,17 +3,16 @@
 Super simple on-line "encounter" tool for roll playing games. Get set up with any map in seconds.
 
 Try it here (no logins needed):    
-https://thybag.github.io/rpg-quick-encounter/index.html?map={path-to-your-map}
-
-**Grab a map** To start, grab a map image you'd like to use. 
-Plenty of great ones are shared on [reddit](https://www.reddit.com/r/dndmaps/)
+https://thybag.github.io/rpg-quick-encounter/
 
 #### How to use it
-**Players** - Click a player to spawn them on the map, then drag them around as need be. Double click to rename.    
-**Spawn NPC's** - Just select name/image from spawn menu and drag them as need be.    
-**Fog** - Click to clear an area of fog, right click to re-add it. You can control fog opacity, clearing size or just turn it off in the fog menu.    
-**Auto save** - Every action is saved to your local storage so you can quickly resume a game at your leisure.    
-**Player bar** - Click a player to spawn or focus on them & reorder freely to match turn order.    
+* **Grab a map** To start, grab a map image you'd like to use. Plenty of great ones are shared on [reddit](https://www.reddit.com/r/dndmaps/)
+* **Players** - Click a player to spawn them on the map, then drag them around as need be. Double click to rename.    
+* **Spawn NPC's** - Just select name/image from spawn menu and drag them as need be.    
+* **Fog** - Click to clear an area of fog, right click to re-add it. You can control fog opacity, clearing size or just turn it off in the fog menu
+* **Auto save** - Every action is saved to your local storage so you can quickly resume a game at your leisure.    
+* **Player bar** - Click a player to spawn or focus on them & reorder freely to match turn order.    
+* **Url options** - Create maps using links,  use `map` for the image and `players` with a comma separated list users.
 
 #### Planned features
 * Better getting started wizard
