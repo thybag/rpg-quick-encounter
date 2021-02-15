@@ -55,10 +55,12 @@ input[type='submit']:hover {
 }
 
 #player-bar div span {
-  text-overflow: ellipsis;
-  height: 1.4rem;
-  overflow: hidden;
-  display: inline-block;
+    text-overflow: ellipsis;
+    height: 1.4rem;
+    overflow: hidden;
+    display: inline-block;
+    text-align:center;
+    display: block;
 }
 
 #player-bar div img {

@@ -37,7 +37,6 @@ export default Component.define({
     },
     spawn: function(e, target) {
         // default
-
         this.trigger('map:spawn', {name: this.el.querySelector('input[type=text]').value, icon: this.el.querySelector('img').src})
     },
     toggle: function() {

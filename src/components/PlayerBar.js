@@ -41,11 +41,14 @@ export default Component.define({
     {
         this.options.players.map((player, index) => {
             let playerToken = playerTpl(player);
+            playerToken.setAttribute('title', player.name);
+
             if (player.spawned) playerToken.classList.add('spawned');
 
             // Listen for name changes
             this.bus.on(`update:players.${index}.name`, (newName) => {
                 playerToken.querySelector('span').innerText = newName;
+                playerToken.setAttribute('title', newName);
             });
 
             this.el.appendChild(playerToken);

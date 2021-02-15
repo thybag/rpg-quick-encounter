@@ -73,7 +73,6 @@ export default Component.define({
         let path = window.location.pathname +'?map=' + mapInput.value;
 
         if (this.playersComponent && this.el.querySelector('.advanced').classList.contains('show')) {
-            console.log(this.playersComponent);
             path += this.playersComponent.toUrlString();
         }
 

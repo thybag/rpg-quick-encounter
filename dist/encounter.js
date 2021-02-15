@@ -46,7 +46,7 @@
             this.initialize.apply(this, arguments);
             this.connect.apply(this, [config.events]);
         };
-        ComponentImplementation.prototype._events = {};
+
         ComponentImplementation.prototype.trigger = function(event, ...args) {
             for (let i of this._events[event] || []) {
                 // Trigger event (either func or method to call)
@@ -107,6 +107,7 @@
             delete this._events[key];
         };
         ComponentImplementation.prototype.connect = function(events) {
+            this._events = [];
             if (!events || typeof events !== 'object') return;
             // connected all events
             for (let [key, method] of Object.entries(events)) {
@@ -177,7 +178,10 @@
         // Create watcher proxy
         function newProxy(result, context) {
             // Don't attempt to proxy nulls
-            if (result === null) return null;
+            if (result === null){
+                console.log("don't watch null");
+                return null;
+            } 
 
             const proxyTraps =  {
                 get: function(obj, prop, receiver)
@@ -17244,6 +17248,77 @@
       return leafletSrc.fog(map.getBounds()).addTo(map);
     }
 
+    function makeIcon(name, icon) {
+        return L.divIcon({
+            className: 'character-icon',
+            html: `<img src='${icon}'><span>${name}</span>`,
+            iconSize:     [60, 80],
+            iconAnchor:   [35, 35],
+        });
+    }
+    function makeMarker(ref, icon, map) {
+        const position = (ref.x) ? L.latLng(ref.x, ref.y) : map.getCenter();
+        return L.marker(
+            position,
+            {
+                icon: icon, 
+                draggable: true,
+            }
+        );
+    }
+
+    var Character = Component$1.define({
+        marker: null,
+        icon: null,
+        ref: null,
+        map: null,
+        events: {
+            "marker:click":     "characterClick",
+            "marker:dblclick":  "characterDblClick",
+            "marker:dragend":   "characterDragend"
+
+        },
+        initialize: function ({ref, map}) {
+            // Store key vals
+            this.ref = ref;
+            this.map = map;
+            this.icon = makeIcon(ref.name, ref.icon);
+            this.marker = makeMarker(ref, this.icon, map);
+
+            // Register events
+            this.marker.on('click', (e) => this.trigger('marker:click', e));
+            this.marker.on('dblclick', (e) => this.trigger('marker:dblclick', e));
+            this.marker.on('dragend', (e) => this.trigger('marker:dragend', e));
+
+            this.render();
+        },
+        panTo: function(){
+            this.map.panTo(this.marker.getLatLng());
+        },
+        characterClick: function(event) {
+            event.preventDefault;
+            console.log("click me");
+        },
+        characterDblClick: function(event) {
+            event.preventDefault;
+            // Going old school for now
+            let name = prompt("Rename?", this.ref.name);
+            if (name) {
+                event.target._icon.querySelector('span').innerText = this.ref.name = name;
+            }
+        },
+        characterDragend: function(event){
+            const latLng = event.target.getLatLng();
+            // Sync
+            this.ref.x = latLng.lat;
+            this.ref.y = latLng.lng;
+        },
+        render: function() {
+            // Add to map
+            this.marker.addTo(this.map);
+        }
+    });
+
     const playerToIconMap = {};
     const npcToIconMap = {};
 
@@ -17255,11 +17330,11 @@
             this.render();
         },
         events: {
-            "map:player:spawn": "spawnPlayer",
-            "map:player:focus": "focusPlayer",
-            "map:spawn": "spawnNpc",
-            "update:fog.enabled": "fogToggled",
-            "update:fog.opacity": "fogOpacityChanged",
+            "map:player:spawn":     "spawnPlayer",
+            "map:player:focus":     "focusPlayer",
+            "map:spawn":            "spawnNpc",
+            "update:fog.enabled":   "fogToggled",
+            "update:fog.opacity":   "fogOpacityChanged",
         },
         spawnPlayer: function(player) {
             const marker = this.generateMarker(player.name, player.icon, player);
@@ -17270,49 +17345,10 @@
             npcToIconMap[npc.id] = marker;
         },
         generateMarker: function(name, img, ref) {
-            const icon = L.divIcon({
-                className: 'character-icon',
-                html: `<img src='${img}'><span>${name}</span>`,
-                iconSize:     [60, 80],
-                iconAnchor:   [35, 35],
-            });
-
-            let position = (ref.x) ? L.latLng(ref.x, ref.y) : this.map.getCenter();
-                
-            const marker = L.marker(
-                position,
-                {
-                    icon: icon, 
-                    draggable: true,
-                    ref: ref
-                }
-            ).addTo(this.map);
-
-            marker.on('click', function(event) {
-                event.preventDefault;
-                console.log("click me");
-            });
-
-            marker.on('dblclick', function(event) {
-                event.preventDefault;
-                // Going old school for now
-                let name = prompt("Rename?", ref.name);
-                if (name) {
-                    event.target._icon.querySelector('span').innerText = ref.name = name;
-                }
-            });
-
-            marker.on('dragend', function(event) {
-                const latLng = event.target.getLatLng();
-                // Sync
-                event.target.options.ref.x = latLng.lat;
-                event.target.options.ref.y = latLng.lng;
-            });
-
-            return marker;
+            return Character.make({ref: ref, map: this.map});
         },
         focusPlayer: function(player) {
-            this.map.panTo(playerToIconMap[player.id].getLatLng());
+            playerToIconMap[player.id].panTo();
         },
         fogToggled: function(newValue) {
             if (newValue) {
@@ -17331,7 +17367,6 @@
             this.map = await createMap('map', this.options.map);
             this.fog = fogOfWar(this.map);
 
-
             this.map.on('click', e => { 
                 if (!this.options.fog.enabled) return;
 
@@ -17345,6 +17380,9 @@
                 this.options.fog.mask = JSON.stringify(this.fog.getLatLngs());
             });
 
+            this.reloadData();
+        },
+        reloadData: function() {
             // Reload save data
             // Load config from settings
             if (!this.options.fog.mask){
@@ -17366,8 +17404,6 @@
             for (const spawn of Object.values(this.options.spawns)) {
                 this.trigger('map:spawn', spawn);
             }
-
-
         }
     });
 
@@ -17457,11 +17493,14 @@
         {
             this.options.players.map((player, index) => {
                 let playerToken = playerTpl(player);
+                playerToken.setAttribute('title', player.name);
+
                 if (player.spawned) playerToken.classList.add('spawned');
 
                 // Listen for name changes
                 this.bus.on(`update:players.${index}.name`, (newName) => {
                     playerToken.querySelector('span').innerText = newName;
+                    playerToken.setAttribute('title', newName);
                 });
 
                 this.el.appendChild(playerToken);
@@ -17628,7 +17667,6 @@
         },
         spawn: function(e, target) {
             // default
-
             this.trigger('map:spawn', {name: this.el.querySelector('input[type=text]').value, icon: this.el.querySelector('img').src});
         },
         toggle: function() {
@@ -17713,31 +17751,17 @@
             });
 
             controls.on('map:spawn', function(v) {
-                let spawn = {...v, id: props.data.spawns.length, x: null, y:null};
+                let spawn = {...v, id: props.data.spawns.length, x: 0, y:0};
                 props.data.spawns.push(spawn);
-
-                map.trigger('map:spawn', spawn);
-            });
-
-            // Memory
-            props.on('change', (type, prop, newVal) => {
-                //console.log(type, prop, newVal);
-                //console.log("DEBUG:"+type + ' ' + prop, newVal, oldVal);
+                map.trigger('map:spawn', props.data.spawns[props.data.spawns.length-1]);
             });
 
             // Save local storage
             props.on('updated', () => {
-                //console.log("saved");
+                //console.log("saved",props.data.spawns);
                 window.localStorage.setItem(config.options.map, JSON.stringify(props.data));
             });
         },
-        events: {
-
-        },
-        render: function () 
-        {
-
-        }
     });
 
     // Icon list
@@ -17956,7 +17980,6 @@
             let path = window.location.pathname +'?map=' + mapInput.value;
 
             if (this.playersComponent && this.el.querySelector('.advanced').classList.contains('show')) {
-                console.log(this.playersComponent);
                 path += this.playersComponent.toUrlString();
             }
 

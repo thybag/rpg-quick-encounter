@@ -37,29 +37,15 @@ export default Component.define({
         });
 
         controls.on('map:spawn', function(v) {
-            let spawn = {...v, id: props.data.spawns.length, x: null, y:null};
+            let spawn = {...v, id: props.data.spawns.length, x: 0, y:0};
             props.data.spawns.push(spawn);
-
-            map.trigger('map:spawn', spawn);
-        });
-
-        // Memory
-        props.on('change', (type, prop, newVal) => {
-            //console.log(type, prop, newVal);
-            //console.log("DEBUG:"+type + ' ' + prop, newVal, oldVal);
+            map.trigger('map:spawn', props.data.spawns[props.data.spawns.length-1]);
         });
 
         // Save local storage
         props.on('updated', () => {
-            //console.log("saved");
+            //console.log("saved",props.data.spawns);
             window.localStorage.setItem(config.options.map, JSON.stringify(props.data));
         });
     },
-    events: {
-
-    },
-    render: function () 
-    {
-
-    }
 });
