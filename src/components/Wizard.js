@@ -1,6 +1,6 @@
 import Component from 'lumpjs/src/component.js';
 import AddPlayers from './Wizard/AddPlayers.js'
-
+import localData from '../services/localData.js';
 // utils
 import checkImage from '../utils/checkImage.js'
 import tpl from '../utils/tpl.js'
@@ -35,7 +35,8 @@ const savesTlp = function(saves) {
         <h2>Your existing saves</h2>
         <main>
             ${saves.map(s=>{
-                return `<a href="?map=${s}"><img src="${s}"/></a>`;
+                const map = s.substr(4);// Remove prefix
+                return `<a href="?map=${map}"><img src="${map}"/></a>`;
             }).join('')}
         </main>
     `);
@@ -91,14 +92,13 @@ export default Component.define({
 
         // Send em to the app!
         window.location = path;
-        
     },
     render: function () 
     {
         this.el.className = 'wizard-container';
 
         // Do you have any saved maps?
-        const saves = Object.keys(window.localStorage);
+        const saves = localData.getMaps();
         if (saves.length !== 0) {
             const saveZone = savesTlp(saves);
             saveZone.className = 'save-zone';

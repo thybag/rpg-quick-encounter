@@ -5,6 +5,8 @@ import EncounterMap from './components/Map.js';
 import Players from './components/PlayerBar.js';
 import Controls from './components/Controls.js';
 
+import localData from './services/localData.js';
+
 export default Component.define({
     initialize: function (config) {
         // Take control of root
@@ -12,12 +14,9 @@ export default Component.define({
         this.el.classList = 'app';
 
         // Get config or load from local storage
-        if (window.localStorage) {
-            let restore = window.localStorage.getItem(config.options.map);
-            if (restore){
-               config.options = JSON.parse(restore);
-            } 
-        }
+        if (localData.hasMap(config.options.map)){
+           config.options = localData.loadMap(config.options.map);
+        } 
 
         // Set global state
         const props = new Model(config.options);
@@ -44,8 +43,7 @@ export default Component.define({
 
         // Save local storage
         props.on('updated', () => {
-            //console.log("saved",props.data.spawns);
-            window.localStorage.setItem(config.options.map, JSON.stringify(props.data));
+            localData.saveMap(config.options.map, props.data);
         });
     },
 });

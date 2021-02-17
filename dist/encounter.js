@@ -17579,17 +17579,75 @@
         }
     });
 
+    var localData = new function() {
+      const storage = window.localStorage;
+      const mapPrefix = 'map:';
+
+      this.hasMap = function(key) {
+        return (storage.getItem(mapPrefix+key));
+      };
+
+      this.loadMap = function(key) {
+        return JSON.parse(storage.getItem(mapPrefix+key))
+      };
+
+      this.saveMap = function(key, data) {
+        return storage.setItem(mapPrefix+key, JSON.stringify(data));
+      };
+
+      this.getMaps = function() {
+          return Object.keys(storage).filter(x => {return x.startsWith('map:')});
+      };
+
+      this.getIcons = function() {
+        let icons = JSON.parse(storage.getItem('icons'));
+        return (icons) ? icons : [];
+      };
+
+      this.saveIcon = function(iconPath) {
+        let icons = this.getIcons();
+        icons.push(iconPath);
+        storage.setItem('icons', JSON.stringify(icons));
+      };
+
+      this.removeIcon = function() {
+
+      };
+    };
+
+    async function checkImage(imgPath) {
+      return await new Promise((resolve, reject) => {
+          let img = document.createElement('img');
+          img.src = imgPath;
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+      });
+    }
+
     const controlTpl$1 = function() {
-        let NPCList = '',MonsterList= '';
-        for(let i=1;i<=8;i++){
+        return tpl(`
+        <main></main>
+        <footer><button>Cancel</button></footer>
+    `);
+    };
+
+    const iconList = function(){
+        let NPCList = '',MonsterList= '',CustomList='';    for(let i=1;i<=8;i++){
            NPCList += `<img src="assets/players/${i}.png">`;
         }
         for(let i=1;i<=33;i++){
            MonsterList += `<img src="assets/monsters/${i}.png">`;
         }
 
+        localData.getIcons().forEach(i => {
+            console.log(i);
+            CustomList += `<img src="${i}">`;
+        });
+
         return tpl(`
-         <div>NPCs/Players</div>
+        <div>Your images</div>
+            <span>+</span>  ${CustomList}
+        <div>NPCs/Players</div>
             ${NPCList}
         <div>Monsters</div>
             ${MonsterList}
@@ -17609,6 +17667,8 @@
         },
         events: {
             "click img": "select",
+            "click button": "close",
+            "click span": "addIcon"
         },
         open: function(parent) {
             this.prop.visible = true;
@@ -17618,12 +17678,32 @@
         select: function(e, item) {
             this.parent.src = item.src;
 
+            this.close();
+        },
+        close: function(){
             this.parent = null;
             this.prop.visible = false;
             this.render();
         },
+        addIcon: async function(){
+            const iconPath = prompt("Icon image url");
+            if (iconPath) {
+                try {
+                    let img = await checkImage(iconPath);
+                    localData.saveIcon(iconPath);
+                    this.parent.src = iconPath;
+                    this.close();
+                } catch(e){
+                    alert("failed to load image");
+                } 
+                
+            }
+            
+        },
         render: async function () 
         {
+            this.el.querySelector('main').innerHTML = iconList().innerHTML;
+
             if (this.prop.visible){
                 this.el.style.display = 'block';
             } else {
@@ -17726,12 +17806,9 @@
             this.el.classList = 'app';
 
             // Get config or load from local storage
-            if (window.localStorage) {
-                let restore = window.localStorage.getItem(config.options.map);
-                if (restore){
-                   config.options = JSON.parse(restore);
-                } 
-            }
+            if (localData.hasMap(config.options.map)){
+               config.options = localData.loadMap(config.options.map);
+            } 
 
             // Set global state
             const props = new Model(config.options);
@@ -17758,22 +17835,21 @@
 
             // Save local storage
             props.on('updated', () => {
-                //console.log("saved",props.data.spawns);
-                window.localStorage.setItem(config.options.map, JSON.stringify(props.data));
+                localData.saveMap(config.options.map, props.data);
             });
         },
     });
 
     // Icon list
-    let iconList = [1,2,3,4,5,6,7,8];
+    let iconList$1 = [1,2,3,4,5,6,7,8];
 
     const getRandomIconId = function() {
-    	return Math.floor((Math.random() * iconList.length) + 1)
+    	return Math.floor((Math.random() * iconList$1.length) + 1)
     };
 
     const getRandomIconIdList = function() {
     	// No point using a smarter algo for 8 elements.
-    	return iconList.sort(() => Math.random() - 0.5);
+    	return iconList$1.sort(() => Math.random() - 0.5);
     };
 
     const getRandomIconLink = function() {
@@ -17785,16 +17861,29 @@
     };
 
     const controlTpl$3 = function() {
-        let NPCList = '',MonsterList= '';
-        for(let i=1;i<=8;i++){
+        return tpl(`
+        <main></main>
+        <footer><button>Cancel</button></footer>
+    `);
+    };
+
+    const iconList$2 = function(){
+        let NPCList = '',MonsterList= '',CustomList='';    for(let i=1;i<=8;i++){
            NPCList += `<img src="assets/players/${i}.png">`;
         }
         for(let i=1;i<=33;i++){
            MonsterList += `<img src="assets/monsters/${i}.png">`;
         }
 
+        localData.getIcons().forEach(i => {
+            console.log(i);
+            CustomList += `<img src="${i}">`;
+        });
+
         return tpl(`
-         <div>NPCs/Players</div>
+        <div>Your images</div>
+            <span>+</span>  ${CustomList}
+        <div>NPCs/Players</div>
             ${NPCList}
         <div>Monsters</div>
             ${MonsterList}
@@ -17814,6 +17903,8 @@
         },
         events: {
             "click img": "select",
+            "click button": "close",
+            "click span": "addIcon"
         },
         open: function(parent) {
             this.prop.visible = true;
@@ -17823,12 +17914,32 @@
         select: function(e, item) {
             this.parent.src = item.src;
 
+            this.close();
+        },
+        close: function(){
             this.parent = null;
             this.prop.visible = false;
             this.render();
         },
+        addIcon: async function(){
+            const iconPath = prompt("Icon image url");
+            if (iconPath) {
+                try {
+                    let img = await checkImage(iconPath);
+                    localData.saveIcon(iconPath);
+                    this.parent.src = iconPath;
+                    this.close();
+                } catch(e){
+                    alert("failed to load image");
+                } 
+                
+            }
+            
+        },
         render: async function () 
         {
+            this.el.querySelector('main').innerHTML = iconList$2().innerHTML;
+
             if (this.prop.visible){
                 this.el.style.display = 'block';
             } else {
@@ -17903,15 +18014,6 @@
         }
     });
 
-    async function checkImage(imgPath) {
-      return await new Promise((resolve, reject) => {
-          let img = document.createElement('img');
-          img.src = imgPath;
-          img.onload = () => resolve(img);
-          img.onerror = reject;
-      });
-    }
-
     const wizardTpl = function(player) {
         return tpl(`
         <div class="wizard">
@@ -17942,7 +18044,8 @@
         <h2>Your existing saves</h2>
         <main>
             ${saves.map(s=>{
-                return `<a href="?map=${s}"><img src="${s}"/></a>`;
+                const map = s.substr(4);// Remove prefix
+                return `<a href="?map=${map}"><img src="${map}"/></a>`;
             }).join('')}
         </main>
     `);
@@ -17998,14 +18101,13 @@
 
             // Send em to the app!
             window.location = path;
-            
         },
         render: function () 
         {
             this.el.className = 'wizard-container';
 
             // Do you have any saved maps?
-            const saves = Object.keys(window.localStorage);
+            const saves = localData.getMaps();
             if (saves.length !== 0) {
                 const saveZone = savesTlp(saves);
                 saveZone.className = 'save-zone';

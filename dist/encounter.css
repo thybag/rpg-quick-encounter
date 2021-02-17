@@ -198,18 +198,56 @@ input[type='submit']:hover {
 .image-picker {
   position: absolute;
   z-index: 1200;
-  top: calc(50vh - 250px);
+  top: calc(50vh - 380px);
   background: #ffff;
   width: 50vw;
   left: 25vw;
-  padding: 1rem;
+
   border: solid 3px #000;
+  box-shadow: 5px 5px 6px -3px #777;
 }
-.image-picker div {
-  margin-top:.5rem;
+.image-picker main {
+    padding: 1rem;
+    overflow: auto;
+    height: 64vh;
+}
+.image-picker main div {
+  margin-top:1rem;
   margin-bottom:.5rem;
+  border-bottom: solid 1px #ddd;
 }
-.spawn-controls img,.image-picker img {width:65px;}
+
+.image-picker footer {
+  background:#24c37e;
+}
+.image-picker footer button {
+  padding: .8rem;
+  border-right: solid 1px #95e1c0;
+}
+.image-picker footer button:hover {
+  background:#1a8758;
+}
+
+.image-picker span {
+  display:inline-block;
+  height: 64px;
+  line-height: 60px;
+  width: 55px;
+  text-align: center;
+  border: solid 1px #ddd;
+  font-size:1.2rem;
+  cursor:pointer;
+  vertical-align: top;
+}
+
+.image-picker span:hover {
+  background: #efefef;
+}
+
+
+
+
+.spawn-controls img,.image-picker main img {width:68px; cursor:pointer;}
 
 /*
  Spawn controls
