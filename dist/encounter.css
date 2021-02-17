@@ -248,19 +248,22 @@ input[type='submit']:hover {
 
 .wizard-container {
     position:absolute;
-    top:3rem;
-    width: 70vw;
-    max-width:1000px;
-    left: calc(50vw - 500px);
+    top:0;
+    left:0;
+    right:0;
+    height: calc(100vh - 40px);
+    overflow: auto;
 }
   .wizard, .save-zone {
+    width:50vw;
+    margin:3rem auto;
     background:#fff;
     box-shadow: 4px 4px 5px -3px #444;
   }
 
   @media screen and (max-width: 1500px) {
-    .wizard-container {
-      left: 15vw;
+    .wizard, .save-zone {
+      width: 80vw;
     }
   }
 

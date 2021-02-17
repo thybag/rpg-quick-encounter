@@ -97,13 +97,12 @@ export default Component.define({
     {
         this.el.className = 'wizard-container';
 
+        // Do you have any saved maps?
         const saves = Object.keys(window.localStorage);
-
         if (saves.length !== 0) {
             const saveZone = savesTlp(saves);
             saveZone.className = 'save-zone';
             this.el.appendChild(saveZone); 
         }
-        
     }
 });
