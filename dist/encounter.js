@@ -17914,24 +17914,37 @@
 
     const wizardTpl = function(player) {
         return tpl(`
-        <h1>Start your new Encounter!</h1>
-        <main>
-            <p>
-                <strong>RPG quick encounter</strong> is an online tool to help you get up and running with your next encounter in moments.
-            </p>
-            <hr>
+        <div class="wizard">
+            <h1>Start your new Encounter!</h1>
+            <main>
+                <p>
+                    <strong>RPG quick encounter</strong> is an online tool to help you get up and running with your next encounter in moments.
+                </p>
+                <hr>
 
-            <label>Paste the link to the map you'd like to use</label>
-            <input type='url' name="map" placeholder="https://..." required>
-            
-            <span class='more'>More options</span>
-            <div class="advanced">
-               
-            </div>
+                <label>Paste the link to the map you'd like to use</label>
+                <input type='url' name="map" placeholder="https://..." required>
+                
+                <span class='more'>More options</span>
+                <div class="advanced">
+                   
+                </div>
+            </main>
+            <footer>
+                <button class="submit">Start your encounter</button>
+            </footer>
+        </div>
+    `);
+    };
+
+    const savesTlp = function(saves) {
+        return tpl(`
+        <h2>Your existing saves</h2>
+        <main>
+            ${saves.map(s=>{
+                return `<a href="?map=${s}"><img src="${s}"/></a>`;
+            }).join('')}
         </main>
-        <footer>
-            <button class="submit">Start your encounter</button>
-        </footer>
     `);
     };
 
@@ -17987,9 +18000,18 @@
             window.location = path;
             
         },
-        render: async function () 
+        render: function () 
         {
-            this.el.className = 'wizard';  
+            this.el.className = 'wizard-container';
+
+            const saves = Object.keys(window.localStorage);
+
+            if (saves.length !== 0) {
+                const saveZone = savesTlp(saves);
+                saveZone.className = 'save-zone';
+                this.el.appendChild(saveZone); 
+            }
+            
         }
     });
 

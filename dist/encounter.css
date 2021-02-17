@@ -36,6 +36,7 @@ input[type='submit']:hover {
 	position: relative;
 	z-index: 990;
 	box-sizing: border-box;
+  display:fixed;
 }
 #player-bar {
     position: absolute;
@@ -245,24 +246,25 @@ input[type='submit']:hover {
   cursor:pointer;
 }
 
-  .wizard {
+.wizard-container {
     position:absolute;
     top:3rem;
-    background:#fff;
     width: 70vw;
     max-width:1000px;
     left: calc(50vw - 500px);
-
+}
+  .wizard, .save-zone {
+    background:#fff;
     box-shadow: 4px 4px 5px -3px #444;
   }
 
   @media screen and (max-width: 1500px) {
-    .wizard {
+    .wizard-container {
       left: 15vw;
     }
   }
 
-  .wizard main,.wizard h1 {
+  .wizard main,.wizard h1,.save-zone h2 {
     padding:2rem;
     margin-bottom:0;
   }
@@ -360,11 +362,6 @@ input[type='submit']:hover {
 
     .wizard .more:after { 
         content: '';
-        /*
-        border-top: solid 1px #eee;
-        display: block;
-        margin-top: -8px;
-        */
         height: 12px;
         display: block;
         width: 110px;
@@ -379,6 +376,20 @@ input[type='submit']:hover {
         margin-bottom:-12px;
 
     }   
+
+    .save-zone main {
+      display: flex;
+      flex-wrap: wrap;
+    }
+    .save-zone a {
+      flex:1;
+      flex-basis: 16%;
+    }
+    .save-zone a img {
+      width:100%;
+      object-fit: cover;
+      height:152px;
+    }
 
 /* quick mobile mode tweaks */
 @media screen and (max-width: 800px) {
