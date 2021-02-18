@@ -25,12 +25,12 @@ const getCustomIcons = function() {
 
 // Get random player icon
 const getRandomPlayerIcon = function() {
-  return iconList[Math.floor((Math.random() * iconList.length) + 1)];
+  return iconList[Math.floor((Math.random() * iconList.length))];
 };
 
 // Get random monster icon
 const getRandomMonsterIcon = function() {
-  return monsterList[Math.floor((Math.random() * monsterList.length) + 1)];
+  return monsterList[Math.floor((Math.random() * monsterList.length))];
 };
 
 // Get player icons as unique list

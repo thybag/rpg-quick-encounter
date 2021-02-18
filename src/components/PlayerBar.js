@@ -48,7 +48,6 @@ export default Component.define({
       });
 
       this.bus.on(`update:players.${index}.spawned`, (spawned) => {
-        console.log('update', spawned, playerToken);
         if (spawned) {
           playerToken.classList.add('spawned');
         } else {
