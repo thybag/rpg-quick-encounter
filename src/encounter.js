@@ -8,42 +8,48 @@ import Controls from './components/Controls.js';
 import localData from './services/localData.js';
 
 export default Component.define({
-    initialize: function (config) {
-        // Take control of root
-        this.el = document.querySelector('body');
-        this.el.classList = 'app';
+  initialize: function(config) {
+    // Take control of root
+    this.el = document.querySelector('body');
+    this.el.classList = 'app';
 
-        // Get config or load from local storage
-        if (localData.hasMap(config.options.map) && config.save){
-           config.options = localData.loadMap(config.options.map);
-        } 
+    // Get config or load from local storage
+    if (localData.hasMap(config.options.map) && config.save !== 'false') {
+      config.options = localData.loadMap(config.options.map);
+    }
 
-        // Set global state
-        const props = new Model(config.options);
-        
-        const map = EncounterMap.make({options: props.data, bus: props});
-        const players = Players.make({options: props.data, bus: props});
-        const controls = Controls.make({options: props.data, bus: props});
+    // Set global state
+    const props = new Model(config.options);
 
-        // Pass model eventing
-        map.listenTo(props);
+    const map = EncounterMap.make({options: props.data, bus: props});
+    const players = Players.make({options: props.data, bus: props});
+    const controls = Controls.make({options: props.data, bus: props});
 
-        players.on('map:player:spawn', function(player) {
-            map.trigger('map:player:spawn', player);
-        });
-        players.on('map:player:focus', function(player) {
-            map.trigger('map:player:focus', player);
-        });
+    // Pass model eventing
+    map.listenTo(props);
 
-        controls.on('map:spawn', function(v) {
-            let spawn = {...v, id: props.data.spawns.length, x: 0, y:0};
-            props.data.spawns.push(spawn);
-            map.trigger('map:spawn', props.data.spawns[props.data.spawns.length-1]);
-        });
+    players.on('map:player:spawn', function(player) {
+      map.trigger('map:player:spawn', player);
+    });
+    players.on('map:player:focus', function(player) {
+      map.trigger('map:player:focus', player);
+    });
 
-        // Save local storage
-        props.on('updated', () => {
-            localData.saveMap(config.options.map, props.data);
-        });
-    },
+    controls.on('map:spawn', function(v) {
+      const spawn = {
+        ...v,
+        id: props.data.spawns.length,
+        x: 0,
+        y: 0,
+        spawned: true,
+      };
+      props.data.spawns.push(spawn);
+      map.trigger('map:spawn', props.data.spawns[props.data.spawns.length - 1]);
+    });
+
+    // Save local storage
+    props.on('updated', () => {
+      localData.saveMap(config.options.map, props.data);
+    });
+  },
 });

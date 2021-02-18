@@ -1,4 +1,4 @@
-import * as turf from '@turf/turf'
+import * as turf from '@turf/turf';
 
 function mployToPairs(mpoly) {
   return mpoly.map((poly) => {
@@ -14,7 +14,7 @@ export default new function() {
 
   this.loadCutOuts = function(multipolys) {
     // Load cutouts from restore.
-    // 
+    //
     // This data is the drawn multipoly of the leaflet mask
     // so we need to strip off the outer mask (as we don't deal with
     // that here) and the convert the poly or multipolys from leaflet
@@ -23,27 +23,27 @@ export default new function() {
     this.cutouts = mployToPairs(multipolys);
 
     return this.cutouts;
-  }
+  };
 
   this.addCutOut = function(poly) {
     if (!this.cutouts) {
       this.cutouts = [poly];
       return this.cutouts;
     }
-    let cutoutPoly = turf.multiPolygon(this.cutouts);
-    let newPoly = turf.polygon([poly]);
-    let u = turf.union(cutoutPoly, newPoly);
+    const cutoutPoly = turf.multiPolygon(this.cutouts);
+    const newPoly = turf.polygon([poly]);
+    const u = turf.union(cutoutPoly, newPoly);
 
     this.cutouts = u.geometry.coordinates;
 
     return this.cutouts;
-  }
+  };
 
   this.removeCutOut = function(poly) {
-    let cutoutPoly = turf.multiPolygon(this.cutouts);
-    let newPoly = turf.polygon([poly]);
+    const cutoutPoly = turf.multiPolygon(this.cutouts);
+    const newPoly = turf.polygon([poly]);
 
-    let u = turf.difference(cutoutPoly, newPoly);
+    const u = turf.difference(cutoutPoly, newPoly);
 
     // Handle null if no difference found (ie. we cleared it all)
     if (!u) {
@@ -51,5 +51,5 @@ export default new function() {
     }
 
     return this.cutouts = u.geometry.coordinates;
-  }
-}
+  };
+}();
