@@ -1,25 +1,26 @@
 # Quick RPG Encounters.
 
-Instantly convert any battlemap in to a playable encounter. Designed to make running a TTRPG encounter over video chat easy.
+Instantly turn any battlemap in to a playable encounter! Designed to make running a TTRPG encounter over video chat easy.
 
-Try it now:    
+Try it now at:    
 https://thybag.github.io/rpg-quick-encounter/
 
 #### How to use it
-* **Grab a map** To start, grab a map image you'd like to use. Plenty of great ones are shared on [reddit](https://www.reddit.com/r/dndmaps/)
-* **Players** - Click a player to spawn them on the map, then drag them around as need be. Double click to rename.    
-* **Spawn NPC's** - Just select name/image from spawn menu and drag them as need be.    
-* **Fog** - Click to clear an area of fog, right click to re-add it. You can control fog opacity, clearing size or just turn it off in the fog menu
-* **Auto save** - Every action is saved to your local storage so you can quickly resume a game at your leisure.    
-* **Player bar** - Click a player to spawn or focus on them & reorder freely to match turn order.    
+* **Any map** Grab the map url, paste it in and your on your way. Plenty of great ones are shared on [reddit](https://www.reddit.com/r/dndmaps/)
+* **Players** - Click a player to spawn them on the map, then drag them around as need be. Double click to rename & right click to remove.    
+* **Spawn NPC's** - Select a name and icon from spawn menu & get them added.
+* **Fog** - Click to clear an area of fog, right click to re-add it. You can control fog opacity, clearing size or just turn it off in the fog menu.
+* **Auto save** - Every action is saved to your local storage so you can quickly resume a game at your leisure. All saves are shown on the wizard.   
+* **Player bar** - Click a player to spawn or focus on them plus reorder freely to match your turn order.   
+* **Player bar** - Custom icons - just drag them in to the image picker and they will be available for all your encounters.
 * **URL options** - Create maps using links,  use `map` for the image and `players` with a comma separated list users.
 
 #### Planned features
-* Better getting started wizard
+* Add more features to getting started.
 * Import/Export - so people can share reconfigured encounters or just move them around.
-* Ability Drag/drop  local maps and images, rather than needing to hotlink them.
-* Custom NPC/player/monster icons
 * Ability to add overlays for injured or dead NPC's.
+* More default NPC options.
+* Set the icon size so they fit your tile system.
 * Proper dialogs - currently I'm slumming it with conform/prompts.
 
 ## Credits
