@@ -17248,10 +17248,112 @@
       return leafletSrc.fog(map.getBounds()).addTo(map);
     }
 
+    let allocated = 0;
+    function uid() {
+      return (new Date().getTime()) + '_' + (allocated++);
+    }
+
+
+    var localData = new function() {
+      const storage = window.localStorage;
+      const mapPrefix = 'map:';
+
+      this.hasMap = function(key) {
+        return (storage.getItem(mapPrefix+key));
+      };
+
+      this.loadMap = function(key) {
+        return JSON.parse(storage.getItem(mapPrefix+key))
+      };
+
+      this.saveMap = function(key, data) {
+        return storage.setItem(mapPrefix+key, JSON.stringify(data));
+      };
+
+      this.getMaps = function() {
+          return Object.keys(storage).filter(x => {return x.startsWith('map:')});
+      };
+
+      this.getIcons = function() {
+        let icons = JSON.parse(storage.getItem('icons'));
+        return (icons) ? icons : {};
+      };
+
+      this.getIcon = function(id){
+          let icons = this.getIcons();
+          return icons[id];
+      };
+
+      this.saveIcon = function(iconPath) {
+        let icons = this.getIcons();
+        icons['icon:' + uid()] = iconPath;
+        storage.setItem('icons', JSON.stringify(icons));
+      };
+
+      this.removeIcon = function() {
+
+      };
+    };
+
+    // Player icons
+    const playerIcons = 9;
+    const monsterIcons = 33;
+
+    let iconList = [], monsterList = [];
+
+    for(let i=1;i<=playerIcons;i++) iconList.push('p:'+i);
+    for(let i=1;i<=monsterIcons;i++) monsterList.push('m:'+i);
+
+
+    // Get all player icons
+    const getPlayerIcons = function(){
+    	return iconList;
+    };
+    //Get all monster icons
+    const getMonsterIcons = function(){
+    	return monsterList;
+    };	
+
+    // Get all custom icons
+    const getCustomIcons = function(){
+    	return Object.keys(localData.getIcons());
+    };	
+
+    // Get random player icon
+    const getRandomPlayerIcon = function() {
+    	return iconList[Math.floor((Math.random() * iconList.length) + 1)];
+    };
+
+    // Get random monster icon
+    const getRandomMonsterIcon = function() {
+    	return monsterList[Math.floor((Math.random() * monsterList.length) + 1)];
+    };
+
+    // Get player icons as unique list
+    const getRandomPlayerIconList = function() {
+    	// No point using a smarter algo for 8 elements.
+    	return iconList.sort(() => Math.random() - 0.5);
+    };
+
+    // Convert icon to image path
+    function getIconImage(icon) {
+    	if (icon.startsWith('icon:')){
+    		return localData.getIcon(icon);
+    	}
+    	if (icon.startsWith('p:')){
+    		return `assets/players/${icon.substr(2)}.png`;
+    	}
+    	if (icon.startsWith('m:')){
+    		return `assets/monsters/${icon.substr(2)}.png`;
+    	}
+
+    	return icon;
+    }
+
     function makeIcon(name, icon) {
         return L.divIcon({
             className: 'character-icon',
-            html: `<img src='${icon}'><span>${name}</span>`,
+            html: `<img src='${getIconImage(icon)}'><span>${name}</span>`,
             iconSize:     [60, 80],
             iconAnchor:   [35, 35],
         });
@@ -17458,7 +17560,7 @@
 
     const playerTpl = function(player) {
         const template = tpl(`
-        <img src="${player.icon}">
+        <img src="${getIconImage(player.icon)}">
         <span>${player.name}</span>
     `);
         playerMap.set(template, player);
@@ -17579,42 +17681,6 @@
         }
     });
 
-    var localData = new function() {
-      const storage = window.localStorage;
-      const mapPrefix = 'map:';
-
-      this.hasMap = function(key) {
-        return (storage.getItem(mapPrefix+key));
-      };
-
-      this.loadMap = function(key) {
-        return JSON.parse(storage.getItem(mapPrefix+key))
-      };
-
-      this.saveMap = function(key, data) {
-        return storage.setItem(mapPrefix+key, JSON.stringify(data));
-      };
-
-      this.getMaps = function() {
-          return Object.keys(storage).filter(x => {return x.startsWith('map:')});
-      };
-
-      this.getIcons = function() {
-        let icons = JSON.parse(storage.getItem('icons'));
-        return (icons) ? icons : [];
-      };
-
-      this.saveIcon = function(iconPath) {
-        let icons = this.getIcons();
-        icons.push(iconPath);
-        storage.setItem('icons', JSON.stringify(icons));
-      };
-
-      this.removeIcon = function() {
-
-      };
-    };
-
     async function checkImage(imgPath) {
       return await new Promise((resolve, reject) => {
           let img = document.createElement('img');
@@ -17631,17 +17697,16 @@
     `);
     };
 
-    const iconList = function(){
-        let NPCList = '',MonsterList= '',CustomList='';    for(let i=1;i<=8;i++){
-           NPCList += `<img src="assets/players/${i}.png">`;
-        }
-        for(let i=1;i<=33;i++){
-           MonsterList += `<img src="assets/monsters/${i}.png">`;
-        }
-
-        localData.getIcons().forEach(i => {
-            console.log(i);
-            CustomList += `<img src="${i}">`;
+    const iconList$1 = function(){
+        let NPCList = '', MonsterList= '', CustomList='';
+        getPlayerIcons().forEach(i => {
+           NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+        });
+        getMonsterIcons().forEach(i => {
+           MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+        });
+        getCustomIcons().forEach(i => {
+           CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
         });
 
         return tpl(`
@@ -17653,6 +17718,33 @@
             ${MonsterList}
     `);
     };
+
+    async function loadFile(iconImg) {
+        const imgData = await new Promise((resolve, reject) => {
+            let reader = new FileReader();
+            reader.readAsDataURL(iconImg);
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+        });
+
+        return checkImage(imgData);    
+    }
+
+
+    async function imageToIcon(iconImg) {
+        let img = await loadFile(iconImg);
+
+        // Local storage is small so we wanna scale it down before we save
+        let canvas = document.createElement('canvas');
+        let ctx = canvas.getContext('2d');
+
+        // draw source image into the off-screen canvas:
+        canvas.width = 70;
+        canvas.height = 70;
+        ctx.drawImage(img, 0, 0, 70, 70);
+
+        return canvas.toDataURL('image/webp', .8)
+    }
 
     var ImagePicker = Component$1.define({
         initialize: function (options) {
@@ -17668,7 +17760,16 @@
         events: {
             "click img": "select",
             "click button": "close",
-            "click span": "addIcon"
+            "click span": "addIcon",
+
+            "dragover main": "uploadEnable",
+            "drop main": "upload",
+            "dragenter main": "uploadFocus",
+            "dragleave main": "uploadBlur",
+        },
+        uploadEnable: function(e){
+            // Need this to be able to upload.
+            e.preventDefault();
         },
         open: function(parent) {
             this.prop.visible = true;
@@ -17677,6 +17778,7 @@
         },
         select: function(e, item) {
             this.parent.src = item.src;
+            this.parent.dataset.id = (item.dataset.id) ? item.dataset.id : item.src;
 
             this.close();
         },
@@ -17685,24 +17787,47 @@
             this.prop.visible = false;
             this.render();
         },
+        uploadFocus: function(e){
+            e.preventDefault();
+            this.el.classList.add("uploadHover");
+        },
+        uploadBlur: function(e){
+            e.preventDefault();
+            this.el.classList.remove("uploadHover");
+        },
+        upload: async function(e) {
+            e.preventDefault();
+
+            const files = e.dataTransfer.files;
+            
+            // Get files that were dragged
+            for (let f=0; f<files.length; f++) {
+                let file = files[f];
+                // Only deal with images
+                if (!file.type.match('image.*')) continue;
+
+                let newIcon = await imageToIcon(file);
+                localData.saveIcon(newIcon);
+            }
+            this.render();
+            this.uploadBlur(e);
+        },
         addIcon: async function(){
             const iconPath = prompt("Icon image url");
             if (iconPath) {
                 try {
                     let img = await checkImage(iconPath);
                     localData.saveIcon(iconPath);
-                    this.parent.src = iconPath;
-                    this.close();
+                    this.render();
                 } catch(e){
                     alert("failed to load image");
                 } 
-                
             }
             
         },
         render: async function () 
         {
-            this.el.querySelector('main').innerHTML = iconList().innerHTML;
+            this.el.querySelector('main').innerHTML = iconList$1().innerHTML;
 
             if (this.prop.visible){
                 this.el.style.display = 'block';
@@ -17713,15 +17838,14 @@
     });
 
     const controlTpl$2 = function() {
-        return tpl( `
-        <img src="assets/monsters/${Math.floor((Math.random() * 30) + 1)}.png">
+        const defaultIcon = getRandomMonsterIcon();    return tpl( `
+        <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
         
         <div>
             <label>Name</label>
             <input type="text" value="Unknown">
             <input type='submit' value="Spawn">
         </div>
-        
     `);
     };
 
@@ -17747,7 +17871,7 @@
         },
         spawn: function(e, target) {
             // default
-            this.trigger('map:spawn', {name: this.el.querySelector('input[type=text]').value, icon: this.el.querySelector('img').src});
+            this.trigger('map:spawn', {name: this.el.querySelector('input[type=text]').value, icon: this.el.querySelector('img').dataset.id});
         },
         toggle: function() {
             this.prop.visible = !this.prop.visible;
@@ -17806,7 +17930,7 @@
             this.el.classList = 'app';
 
             // Get config or load from local storage
-            if (localData.hasMap(config.options.map)){
+            if (localData.hasMap(config.options.map) && config.save){
                config.options = localData.loadMap(config.options.map);
             } 
 
@@ -17840,26 +17964,6 @@
         },
     });
 
-    // Icon list
-    let iconList$1 = [1,2,3,4,5,6,7,8];
-
-    const getRandomIconId = function() {
-    	return Math.floor((Math.random() * iconList$1.length) + 1)
-    };
-
-    const getRandomIconIdList = function() {
-    	// No point using a smarter algo for 8 elements.
-    	return iconList$1.sort(() => Math.random() - 0.5);
-    };
-
-    const getRandomIconLink = function() {
-    	return `assets/players/${getRandomIconId()}.png`
-    };
-
-    const getRandomIconLinksList = function() {
-    	return getRandomIconIdList().map((v) => `assets/players/${v}.png`);
-    };
-
     const controlTpl$3 = function() {
         return tpl(`
         <main></main>
@@ -17868,16 +17972,15 @@
     };
 
     const iconList$2 = function(){
-        let NPCList = '',MonsterList= '',CustomList='';    for(let i=1;i<=8;i++){
-           NPCList += `<img src="assets/players/${i}.png">`;
-        }
-        for(let i=1;i<=33;i++){
-           MonsterList += `<img src="assets/monsters/${i}.png">`;
-        }
-
-        localData.getIcons().forEach(i => {
-            console.log(i);
-            CustomList += `<img src="${i}">`;
+        let NPCList = '', MonsterList= '', CustomList='';
+        getPlayerIcons().forEach(i => {
+           NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+        });
+        getMonsterIcons().forEach(i => {
+           MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+        });
+        getCustomIcons().forEach(i => {
+           CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
         });
 
         return tpl(`
@@ -17889,6 +17992,33 @@
             ${MonsterList}
     `);
     };
+
+    async function loadFile$1(iconImg) {
+        const imgData = await new Promise((resolve, reject) => {
+            let reader = new FileReader();
+            reader.readAsDataURL(iconImg);
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+        });
+
+        return checkImage(imgData);    
+    }
+
+
+    async function imageToIcon$1(iconImg) {
+        let img = await loadFile$1(iconImg);
+
+        // Local storage is small so we wanna scale it down before we save
+        let canvas = document.createElement('canvas');
+        let ctx = canvas.getContext('2d');
+
+        // draw source image into the off-screen canvas:
+        canvas.width = 70;
+        canvas.height = 70;
+        ctx.drawImage(img, 0, 0, 70, 70);
+
+        return canvas.toDataURL('image/webp', .8)
+    }
 
     var ImagePicker$1 = Component$1.define({
         initialize: function (options) {
@@ -17904,7 +18034,16 @@
         events: {
             "click img": "select",
             "click button": "close",
-            "click span": "addIcon"
+            "click span": "addIcon",
+
+            "dragover main": "uploadEnable",
+            "drop main": "upload",
+            "dragenter main": "uploadFocus",
+            "dragleave main": "uploadBlur",
+        },
+        uploadEnable: function(e){
+            // Need this to be able to upload.
+            e.preventDefault();
         },
         open: function(parent) {
             this.prop.visible = true;
@@ -17913,6 +18052,7 @@
         },
         select: function(e, item) {
             this.parent.src = item.src;
+            this.parent.dataset.id = (item.dataset.id) ? item.dataset.id : item.src;
 
             this.close();
         },
@@ -17921,18 +18061,41 @@
             this.prop.visible = false;
             this.render();
         },
+        uploadFocus: function(e){
+            e.preventDefault();
+            this.el.classList.add("uploadHover");
+        },
+        uploadBlur: function(e){
+            e.preventDefault();
+            this.el.classList.remove("uploadHover");
+        },
+        upload: async function(e) {
+            e.preventDefault();
+
+            const files = e.dataTransfer.files;
+            
+            // Get files that were dragged
+            for (let f=0; f<files.length; f++) {
+                let file = files[f];
+                // Only deal with images
+                if (!file.type.match('image.*')) continue;
+
+                let newIcon = await imageToIcon$1(file);
+                localData.saveIcon(newIcon);
+            }
+            this.render();
+            this.uploadBlur(e);
+        },
         addIcon: async function(){
             const iconPath = prompt("Icon image url");
             if (iconPath) {
                 try {
                     let img = await checkImage(iconPath);
                     localData.saveIcon(iconPath);
-                    this.parent.src = iconPath;
-                    this.close();
+                    this.render();
                 } catch(e){
                     alert("failed to load image");
                 } 
-                
             }
             
         },
@@ -17958,7 +18121,7 @@
 
     const playerTpl$1 = function(name, icon) {
         return tpl(`
-        <span class="icon"><img src="${icon}"></span>
+        <span class="icon"><img src="${getIconImage(icon)}" data-id="${icon}"></span>
         <input type='text' name="name" value="${name}">
         <span class="remove">X</span>
     `, 'player-option');
@@ -17972,7 +18135,7 @@
             this.el = wizardPlayersTpl();
             this.picker = null;
 
-            const icons = getRandomIconLinksList();
+            const icons = getRandomPlayerIconList();
             this.playerTarget = this.el.querySelector('div');
 
             defaultPlayers.forEach((p, idx) => {
@@ -17991,7 +18154,7 @@
             target.parentNode.remove();
         },
         createPlayerRow: function(name ='', icon=null) {
-            if (!icon) icon = getRandomIconLink();
+            if (!icon) icon = getRandomPlayerIcon();
 
             const nPlayer = playerTpl$1(name, icon);
             this.playerTarget.appendChild(nPlayer);
@@ -18004,7 +18167,7 @@
             let parts = [];
 
             for(let node of this.playerTarget.children) {
-                parts.push(`${node.querySelector('input').value};${node.querySelector('img').src}`);
+                parts.push(`${node.querySelector('input').value}|${node.querySelector('img').dataset.id}`);
             }
             return '&players='+parts.join(',');
         },
@@ -18116,6 +18279,14 @@
         }
     });
 
+    // Icon list
+    let iconList$3 = [1,2,3,4,5,6,7,8];
+
+    const getRandomIconIdList = function() {
+    	// No point using a smarter algo for 8 elements.
+    	return iconList$3.sort(() => Math.random() - 0.5);
+    };
+
     // Define player defaults
     const defaultPlayers$1 = [
     	{id: 1, name:'Wizard', icon: null},
@@ -18130,6 +18301,9 @@
     let map = url.get('map');
     let players = parsePlayerUrl(url.get('players'));
     let fog$1 = url.get('fog');
+
+    // Disable reload from local storage
+    let saving = url.has('saving') ? url.get('saving') : true;
 
     let component = null;
 
@@ -18146,14 +18320,15 @@
     		// Setup default images if none provided
     		'players': configurePlayers(players),
     		'spawns': [],
-    		fog: {
+    		'fog': {
     			enabled: !(fog$1 && fog$1 == 'false'),
     			opacity: 70,
     			clearSize: 36,
     			mask: ''
-    		}
+    		},
+    		'data:version': 2
     	};
-    	component = Encounter.make({options});
+    	component = Encounter.make({options, save: saving});
     }
 
     var component$1 = component;
@@ -18175,8 +18350,8 @@
     	// Url provided
     	return urlString.split(',').map((p) => {
     		// Any custom icons?
-    		if (p.includes(';')) {
-    			const parts = p.split(';');
+    		if (p.includes('|')) {
+    			const parts = p.split('|');
     			return {'name': parts[0], 'icon': parts[1]};
     		}
     		return {'name': p};

@@ -1,7 +1,6 @@
 import Component from 'lumpjs/src/component.js';
 import tpl from '../../utils/tpl.js'
-import {getRandomIconLink, getRandomIconLinksList} from '../../utils/getRandomPlayerIcons.js';
-
+import getIconImage, {getRandomPlayerIcon, getRandomPlayerIconList} from '../../utils/getIconImage.js';
 import ImagePicker from '../Controls/imagePicker.js';
 
 const wizardPlayersTpl = function(player) {
@@ -14,7 +13,7 @@ const wizardPlayersTpl = function(player) {
 
 const playerTpl = function(name, icon) {
     return tpl(`
-        <span class="icon"><img src="${icon}"></span>
+        <span class="icon"><img src="${getIconImage(icon)}" data-id="${icon}"></span>
         <input type='text' name="name" value="${name}">
         <span class="remove">X</span>
     `, 'player-option');
@@ -28,7 +27,7 @@ export default Component.define({
         this.el = wizardPlayersTpl();
         this.picker = null;
 
-        const icons = getRandomIconLinksList();
+        const icons = getRandomPlayerIconList();
         this.playerTarget = this.el.querySelector('div');
 
         defaultPlayers.forEach((p, idx) => {
@@ -47,7 +46,7 @@ export default Component.define({
         target.parentNode.remove();
     },
     createPlayerRow: function(name ='', icon=null) {
-        if (!icon) icon = getRandomIconLink();
+        if (!icon) icon = getRandomPlayerIcon();
 
         const nPlayer = playerTpl(name, icon);
         this.playerTarget.appendChild(nPlayer);
@@ -60,7 +59,7 @@ export default Component.define({
         let parts = [];
 
         for(let node of this.playerTarget.children) {
-            parts.push(`${node.querySelector('input').value};${node.querySelector('img').src}`);
+            parts.push(`${node.querySelector('input').value}|${node.querySelector('img').dataset.id}`);
         }
         return '&players='+parts.join(',');
     },

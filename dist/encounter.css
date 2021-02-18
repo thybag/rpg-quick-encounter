@@ -230,8 +230,8 @@ input[type='submit']:hover {
 
 .image-picker span {
   display:inline-block;
-  height: 64px;
-  line-height: 60px;
+  height: 60px;
+  line-height: 55px;
   width: 55px;
   text-align: center;
   border: solid 1px #ddd;
@@ -245,9 +245,8 @@ input[type='submit']:hover {
 }
 
 
-
-
-.spawn-controls img,.image-picker main img {width:68px; cursor:pointer;}
+.image-picker main img {width:55px; cursor:pointer;}
+.spawn-controls img {width:68px; cursor:pointer;}
 
 /*
  Spawn controls
@@ -453,6 +452,27 @@ input[type='submit']:hover {
     .app #control-bar span, .app #control-bar a {
         flex:1;
     }
+}
+
+.uploadHover main {
+  filter: blur(3px);
+}
+.uploadHover div, .uploadHover span, .uploadHover img, .uploadHover:before {
+  pointer-events: none;
+}
+.uploadHover:before {
+    content:"Add icon?";
+    position: absolute;
+    left: calc(50% - 80px - .8rem);
+    width: 160px;
+    top: 15%;
+    font-size: 1.2rem;
+    border: solid 2px #24c37e;
+    padding: .8rem;
+    background: #24c37e;
+    z-index: 1;
+    text-align: center;
+    color:#fff;
 }
 /* required styles */
 

@@ -1,9 +1,10 @@
 import Component from 'lumpjs/src/component.js';
+import getIconImage from '../../utils/getIconImage.js';
 
 function makeIcon(name, icon) {
     return L.divIcon({
         className: 'character-icon',
-        html: `<img src='${icon}'><span>${name}</span>`,
+        html: `<img src='${getIconImage(icon)}'><span>${name}</span>`,
         iconSize:     [60, 80],
         iconAnchor:   [35, 35],
     });

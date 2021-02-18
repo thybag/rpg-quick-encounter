@@ -23,6 +23,9 @@ let map = url.get('map');
 let players = parsePlayerUrl(url.get('players'));
 let fog = url.get('fog');
 
+// Disable reload from local storage
+let saving = url.has('saving') ? url.get('saving') : true;
+
 let component = null;
 
 // Do we have enought?
@@ -38,14 +41,15 @@ if (!map) {
 		// Setup default images if none provided
 		'players': configurePlayers(players),
 		'spawns': [],
-		fog: {
+		'fog': {
 			enabled: !(fog && fog == 'false'),
 			opacity: 70,
 			clearSize: 36,
 			mask: ''
-		}
+		},
+		'data:version': 2
 	}
-	component = Encounter.make({options});
+	component = Encounter.make({options, save: saving});
 }
 
 export default component;
@@ -67,8 +71,8 @@ function parsePlayerUrl(urlString) {
 	// Url provided
 	return urlString.split(',').map((p) => {
 		// Any custom icons?
-		if (p.includes(';')) {
-			const parts = p.split(';')
+		if (p.includes('|')) {
+			const parts = p.split('|')
 			return {'name': parts[0], 'icon': parts[1]};
 		}
 		return {'name': p};

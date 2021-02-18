@@ -1,17 +1,18 @@
 import Component from 'lumpjs/src/component.js';
 import tpl from '../../utils/tpl.js'
 import ImagePicker from './ImagePicker.js'
+import getIconImage, {getRandomMonsterIcon} from '../../utils/getIconImage.js';
 
 const controlTpl = function() {
+    const defaultIcon = getRandomMonsterIcon();;
     return tpl( `
-        <img src="assets/monsters/${Math.floor((Math.random() * 30) + 1)}.png">
+        <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
         
         <div>
             <label>Name</label>
             <input type="text" value="Unknown">
             <input type='submit' value="Spawn">
         </div>
-        
     `);
 }
 
@@ -37,7 +38,7 @@ export default Component.define({
     },
     spawn: function(e, target) {
         // default
-        this.trigger('map:spawn', {name: this.el.querySelector('input[type=text]').value, icon: this.el.querySelector('img').src})
+        this.trigger('map:spawn', {name: this.el.querySelector('input[type=text]').value, icon: this.el.querySelector('img').dataset.id})
     },
     toggle: function() {
         this.prop.visible = !this.prop.visible;

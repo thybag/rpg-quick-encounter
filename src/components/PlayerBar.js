@@ -1,12 +1,13 @@
 import Component from 'lumpjs/src/component.js';
 import dragSort from '../utils/dragSort.js'
 import tpl from '../utils/tpl.js'
+import getIconImage from '../utils/getIconImage.js';
 
 const playerMap = new WeakMap();
 
 const playerTpl = function(player) {
     const template = tpl(`
-        <img src="${player.icon}">
+        <img src="${getIconImage(player.icon)}">
         <span>${player.name}</span>
     `);
     playerMap.set(template, player);

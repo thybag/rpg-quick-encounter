@@ -14,7 +14,7 @@ export default Component.define({
         this.el.classList = 'app';
 
         // Get config or load from local storage
-        if (localData.hasMap(config.options.map)){
+        if (localData.hasMap(config.options.map) && config.save){
            config.options = localData.loadMap(config.options.map);
         } 
 
