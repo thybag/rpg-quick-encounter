@@ -1,15 +1,26 @@
 import L from 'leaflet';
+import Template from '../../utils/template.js';
 import Component from 'lumpjs/src/component.js';
 import getIconImage from '../../utils/getIconImage.js';
+
+const iconTpl = new Template({
+  template: (name, icon) => {
+    return `
+        <img src="${getIconImage(icon)}">
+        <span>${name}</span>
+    `;
+  },
+});
 
 function makeIcon(name, icon) {
   return L.divIcon({
     className: 'character-icon',
-    html: `<img src='${getIconImage(icon)}'><span>${name}</span>`,
+    html: iconTpl.render(name, icon),
     iconSize: [60, 80],
     iconAnchor: [35, 35],
   });
 }
+
 function makeMarker(ref, icon, map) {
   const position = (ref.x) ? L.latLng(ref.x, ref.y) : map.getCenter();
   return L.marker(

@@ -1,51 +1,56 @@
 import Component from 'lumpjs/src/component.js';
 import AddPlayers from './Wizard/AddPlayers.js';
 import localData from '../services/localData.js';
+import Template from '../utils/template.js';
 // utils
 import checkImage from '../utils/checkImage.js';
-import tpl from '../utils/tpl.js';
 
-const wizardTpl = function(player) {
-  return tpl(`
-        <div class="wizard">
-            <h1>Start your new Encounter!</h1>
-            <main>
-                <p>
-                    <strong>RPG quick encounter</strong> is an online tool to help you get up and running with 
-                    your next encounter in moments.
-                </p>
-                <hr>
+const wizardTpl = new Template({
+  template: () => {
+    return `
+      <div class="wizard">
+          <h1>Start your new Encounter!</h1>
+          <main>
+              <p>
+                  <strong>RPG quick encounter</strong> is an online tool to help you get up and running with 
+                  your next encounter in moments.
+              </p>
+              <hr>
 
-                <label>Paste the link to the map you'd like to use</label>
-                <input type='url' name="map" placeholder="https://..." required>
-                
-                <span class='more'>More options</span>
-                <div class="advanced">
-                   
-                </div>
-            </main>
-            <footer>
-                <button class="submit">Start your encounter</button>
-            </footer>
-        </div>
-    `);
-};
+              <label>Paste the link to the map you'd like to use</label>
+              <input type='url' name="map" placeholder="https://..." required>
+              
+              <span class='more'>More options</span>
+              <div class="advanced">
+                 
+              </div>
+          </main>
+          <footer>
+              <button class="submit">Start your encounter</button>
+          </footer>
+      </div>
+    `;
+  },
+});
 
-const savesTlp = function(saves) {
-  return tpl(`
-        <h2>Your existing saves</h2>
-        <main>
-            ${saves.map((s) => {
+const savesTlp = new Template({
+  'template': (saves) => {
+    return `
+      <h2>Your existing saves</h2>
+      <main>
+          ${saves.map((s) => {
     const map = s.substr(4);// Remove prefix
     return `<a href="?map=${map}"><img src="${map}"/></a>`;
   }).join('')}
-        </main>
-    `);
-};
+      </main>
+    `;
+  },
+  'safe': false,
+});
 
 export default Component.define({
   initialize: function(config) {
-    this.el = wizardTpl();
+    this.el = wizardTpl.render();
     document.body.appendChild(this.el);
     this.render();
   },
@@ -100,7 +105,7 @@ export default Component.define({
     // Do you have any saved maps?
     const saves = localData.getMaps();
     if (saves.length !== 0) {
-      const saveZone = savesTlp(saves);
+      const saveZone = savesTlp.render(saves);
       saveZone.className = 'save-zone';
       this.el.appendChild(saveZone);
     }

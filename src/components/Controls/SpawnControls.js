@@ -1,24 +1,25 @@
 import Component from 'lumpjs/src/component.js';
-import tpl from '../../utils/tpl.js';
+import Template from '../../utils/template.js';
 import ImagePicker from './ImagePicker.js';
 import getIconImage, {getRandomMonsterIcon} from '../../utils/getIconImage.js';
 
-const controlTpl = function() {
-  const defaultIcon = getRandomMonsterIcon();
-  return tpl(`
-        <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
-        
-        <div>
-            <label>Name</label>
-            <input type="text" value="Unknown">
-            <input type='submit' value="Spawn">
-        </div>
-    `);
-};
+const controlTpl = new Template({
+  template: () => {
+    const defaultIcon = getRandomMonsterIcon();
+    return `
+      <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
+      <div>
+          <label>Name</label>
+          <input type="text" value="Unknown">
+          <input type='submit' value="Spawn">
+      </div>
+    `;
+  },
+});
 
 export default Component.define({
   initialize: function(options) {
-    this.el = controlTpl();
+    this.el = controlTpl.render();
     this.el.className = 'spawn-controls';
     this.el.style.display = 'none';
     document.body.appendChild(this.el);

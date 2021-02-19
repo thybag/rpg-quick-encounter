@@ -30,6 +30,6 @@ Made possible by the great work in;
 * [Leaflet.js](https://leafletjs.com/) - Powering the maps themselves
 * [Rollup.js](https://rollupjs.org/) - Build tooling
 * [turf.js](https://turfjs.org/) - Clever GeoJson tools.
-* [Kenny's](https://www.kenney.nl/) awesome free assets. 
+* [Kenny's](https://www.kenney.nl/) - Awesome free assets. 
 * [Lump.js](https://github.com/thybag/lump.js) - Because this is a hobby project, so why not attempt to roll my own js framework.
 * Github - for hosting

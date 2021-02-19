@@ -1,5 +1,5 @@
 import Component from 'lumpjs/src/component.js';
-import tpl from '../../utils/tpl.js';
+import Template from '../../utils/template.js';
 import localData from '../../services/localData.js';
 import checkImage from '../../utils/checkImage.js';
 
@@ -11,35 +11,40 @@ import getIconImage,
 }
   from '../../utils/getIconImage.js';
 
-const controlTpl = function() {
-  return tpl(`
-        <main></main>
-        <footer><button>Cancel</button></footer>
-    `);
-};
 
-const iconList = function() {
-  let NPCList = ''; let MonsterList = ''; let CustomList = '';
+const controlTpl = new Template({
+  template: () => {
+    return `
+      <main></main>
+      <footer><button>Cancel</button></footer>
+    `;
+  },
+});
 
-  getPlayerIcons().forEach((i) => {
-    NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-  });
-  getMonsterIcons().forEach((i) => {
-    MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-  });
-  getCustomIcons().forEach((i) => {
-    CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-  });
+const iconList = new Template({
+  template: () => {
+    let NPCList = ''; let MonsterList = ''; let CustomList = '';
 
-  return tpl(`
-        <div>Your images</div>
-            <span>+</span>  ${CustomList}
-        <div>NPCs/Players</div>
-            ${NPCList}
-        <div>Monsters</div>
-            ${MonsterList}
-    `);
-};
+    getPlayerIcons().forEach((i) => {
+      NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+    });
+    getMonsterIcons().forEach((i) => {
+      MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+    });
+    getCustomIcons().forEach((i) => {
+      CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+    });
+
+    return `
+      <div>Your images</div>
+          <span>+</span>  ${CustomList}
+      <div>NPCs/Players</div>
+          ${NPCList}
+      <div>Monsters</div>
+          ${MonsterList}
+      `;
+  },
+});
 
 /**
  * load filedata from upload
@@ -81,7 +86,7 @@ async function imageToIcon(iconImg) {
 
 export default Component.define({
   initialize: function(options) {
-    this.el = controlTpl();
+    this.el = controlTpl.render();
     this.el.className = 'image-picker';
     this.el.style.display = 'none';
     document.body.appendChild(this.el);

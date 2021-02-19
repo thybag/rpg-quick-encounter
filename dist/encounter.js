@@ -17248,6 +17248,37 @@
       return leafletSrc.fog(map.getBounds()).addTo(map);
     }
 
+    function safeText(text) {
+      // Render as text node
+      const html = document.createElement('p');
+      html.appendChild(document.createTextNode(text));
+      return html.innerHTML;
+    }
+
+    function Template(methods) {
+      this.render = function(...args) {
+        // Escape input values
+        if (methods.safe !== false) {
+          // Ensure args are safe
+          args = args.map((value) => {
+            return safeText(value);
+          });
+        }
+
+        // Render template itself
+        const container = document.createElement('div');
+        const tpl = methods.template(...args);
+        container.innerHTML = tpl;
+
+        if (methods.className) {
+          container.className = methods.className;
+        }
+
+        // Return element
+        return container;
+      };
+    }
+
     let allocated = 0;
 
     function uid() {
@@ -17338,6 +17369,10 @@
 
     // Convert icon to image path
     function getIconImage(icon) {
+      if (!icon) {
+        return '';
+      }
+
       if (icon.startsWith('icon:')) {
         return localData.getIcon(icon);
       }
@@ -17351,14 +17386,24 @@
       return icon;
     }
 
+    const iconTpl = new Template({
+      template: (name, icon) => {
+        return `
+        <img src="${getIconImage(icon)}">
+        <span>${name}</span>
+    `;
+      },
+    });
+
     function makeIcon(name, icon) {
       return leafletSrc.divIcon({
         className: 'character-icon',
-        html: `<img src='${getIconImage(icon)}'><span>${name}</span>`,
+        html: iconTpl.render(name, icon),
         iconSize: [60, 80],
         iconAnchor: [35, 35],
       });
     }
+
     function makeMarker(ref, icon, map) {
       const position = (ref.x) ? leafletSrc.latLng(ref.x, ref.y) : map.getCenter();
       return leafletSrc.marker(
@@ -17557,23 +17602,16 @@
       });
     }
 
-    function tpl(template, className = false) {
-      const container = document.createElement('div');
-      container.innerHTML = template;
-      if (className) container.className = className;
-      return container;
-    }
-
     const playerMap = new WeakMap();
 
-    const playerTpl = function(player) {
-      const template = tpl(`
-        <img src="${getIconImage(player.icon)}">
-        <span>${player.name}</span>
-    `);
-      playerMap.set(template, player);
-      return template;
-    };
+    const playerTpl = new Template({
+      template: (name, icon) => {
+        return `
+        <img src="${getIconImage(icon)}">
+        <span>${name}</span>
+    `;
+      },
+    });
 
     var Players = Component$1.define({
       initialize: function(config) {
@@ -17597,7 +17635,9 @@
       },
       render: async function() {
         this.options.players.map((player, index) => {
-          const playerToken = playerTpl(player);
+          const playerToken = playerTpl.render(player.name, player.icon);
+          playerMap.set(playerToken, player);
+
           playerToken.setAttribute('title', player.name);
 
           if (player.spawned) playerToken.classList.add('spawned');
@@ -17691,35 +17731,39 @@
       },
     });
 
-    const controlTpl$1 = function() {
-      return tpl(`
-        <main></main>
-        <footer><button>Cancel</button></footer>
-    `);
-    };
+    const controlTpl$1 = new Template({
+      template: () => {
+        return `
+      <main></main>
+      <footer><button>Cancel</button></footer>
+    `;
+      },
+    });
 
-    const iconList$1 = function() {
-      let NPCList = ''; let MonsterList = ''; let CustomList = '';
+    const iconList$1 = new Template({
+      template: () => {
+        let NPCList = ''; let MonsterList = ''; let CustomList = '';
 
-      getPlayerIcons().forEach((i) => {
-        NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-      });
-      getMonsterIcons().forEach((i) => {
-        MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-      });
-      getCustomIcons().forEach((i) => {
-        CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-      });
+        getPlayerIcons().forEach((i) => {
+          NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+        });
+        getMonsterIcons().forEach((i) => {
+          MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+        });
+        getCustomIcons().forEach((i) => {
+          CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+        });
 
-      return tpl(`
-        <div>Your images</div>
-            <span>+</span>  ${CustomList}
-        <div>NPCs/Players</div>
-            ${NPCList}
-        <div>Monsters</div>
-            ${MonsterList}
-    `);
-    };
+        return `
+      <div>Your images</div>
+          <span>+</span>  ${CustomList}
+      <div>NPCs/Players</div>
+          ${NPCList}
+      <div>Monsters</div>
+          ${MonsterList}
+      `;
+      },
+    });
 
     /**
      * load filedata from upload
@@ -17761,7 +17805,7 @@
 
     var ImagePicker = Component$1.define({
       initialize: function(options) {
-        this.el = controlTpl$1();
+        this.el = controlTpl$1.render();
         this.el.className = 'image-picker';
         this.el.style.display = 'none';
         document.body.appendChild(this.el);
@@ -17848,22 +17892,23 @@
       },
     });
 
-    const controlTpl$2 = function() {
-      const defaultIcon = getRandomMonsterIcon();
-      return tpl(`
-        <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
-        
-        <div>
-            <label>Name</label>
-            <input type="text" value="Unknown">
-            <input type='submit' value="Spawn">
-        </div>
-    `);
-    };
+    const controlTpl$2 = new Template({
+      template: () => {
+        const defaultIcon = getRandomMonsterIcon();
+        return `
+      <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
+      <div>
+          <label>Name</label>
+          <input type="text" value="Unknown">
+          <input type='submit' value="Spawn">
+      </div>
+    `;
+      },
+    });
 
     var SpawnControls = Component$1.define({
       initialize: function(options) {
-        this.el = controlTpl$2();
+        this.el = controlTpl$2.render();
         this.el.className = 'spawn-controls';
         this.el.style.display = 'none';
         document.body.appendChild(this.el);
@@ -17980,35 +18025,39 @@
       },
     });
 
-    const controlTpl$3 = function() {
-      return tpl(`
-        <main></main>
-        <footer><button>Cancel</button></footer>
-    `);
-    };
+    const controlTpl$3 = new Template({
+      template: () => {
+        return `
+      <main></main>
+      <footer><button>Cancel</button></footer>
+    `;
+      },
+    });
 
-    const iconList$2 = function() {
-      let NPCList = ''; let MonsterList = ''; let CustomList = '';
+    const iconList$2 = new Template({
+      template: () => {
+        let NPCList = ''; let MonsterList = ''; let CustomList = '';
 
-      getPlayerIcons().forEach((i) => {
-        NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-      });
-      getMonsterIcons().forEach((i) => {
-        MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-      });
-      getCustomIcons().forEach((i) => {
-        CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-      });
+        getPlayerIcons().forEach((i) => {
+          NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+        });
+        getMonsterIcons().forEach((i) => {
+          MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+        });
+        getCustomIcons().forEach((i) => {
+          CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+        });
 
-      return tpl(`
-        <div>Your images</div>
-            <span>+</span>  ${CustomList}
-        <div>NPCs/Players</div>
-            ${NPCList}
-        <div>Monsters</div>
-            ${MonsterList}
-    `);
-    };
+        return `
+      <div>Your images</div>
+          <span>+</span>  ${CustomList}
+      <div>NPCs/Players</div>
+          ${NPCList}
+      <div>Monsters</div>
+          ${MonsterList}
+      `;
+      },
+    });
 
     /**
      * load filedata from upload
@@ -18050,7 +18099,7 @@
 
     var ImagePicker$1 = Component$1.define({
       initialize: function(options) {
-        this.el = controlTpl$3();
+        this.el = controlTpl$3.render();
         this.el.className = 'image-picker';
         this.el.style.display = 'none';
         document.body.appendChild(this.el);
@@ -18137,28 +18186,34 @@
       },
     });
 
-    const wizardPlayersTpl = function(player) {
-      return tpl(`
+    const wizardPlayersTpl = new Template({
+      template: () => {
+        return `
         <h2>Players</h2>
         <div></div>
         <button>Add another player</button>
-    `);
-    };
+    `;
+      },
+    });
 
-    const playerTpl$1 = function(name, icon) {
-      return tpl(`
+    const playerTpl$1 = new Template({
+      template: (name, icon) => {
+        return `
         <span class="icon"><img src="${getIconImage(icon)}" data-id="${icon}"></span>
         <input type='text' name="name" value="${name}">
         <span class="remove">X</span>
-    `, 'player-option');
-    };
+    `;
+      },
+      className: 'player-option',
+    });
+
 
     const defaultPlayers = ['Caster', 'Tank', 'Rogue', 'Healer', 'Wizard'];
 
     var AddPlayers = Component$1.define({
       playerTarget: null,
       initialize: function(config) {
-        this.el = wizardPlayersTpl();
+        this.el = wizardPlayersTpl.render();
         this.picker = null;
 
         const icons = getRandomPlayerIconList();
@@ -18182,7 +18237,7 @@
       createPlayerRow: function(name = '', icon = null) {
         if (!icon) icon = getRandomPlayerIcon();
 
-        const nPlayer = playerTpl$1(name, icon);
+        const nPlayer = playerTpl$1.render(name, icon);
         this.playerTarget.appendChild(nPlayer);
       },
       openPickList: function(e, target) {
@@ -18202,47 +18257,52 @@
       },
     });
 
-    const wizardTpl = function(player) {
-      return tpl(`
-        <div class="wizard">
-            <h1>Start your new Encounter!</h1>
-            <main>
-                <p>
-                    <strong>RPG quick encounter</strong> is an online tool to help you get up and running with 
-                    your next encounter in moments.
-                </p>
-                <hr>
+    const wizardTpl = new Template({
+      template: () => {
+        return `
+      <div class="wizard">
+          <h1>Start your new Encounter!</h1>
+          <main>
+              <p>
+                  <strong>RPG quick encounter</strong> is an online tool to help you get up and running with 
+                  your next encounter in moments.
+              </p>
+              <hr>
 
-                <label>Paste the link to the map you'd like to use</label>
-                <input type='url' name="map" placeholder="https://..." required>
-                
-                <span class='more'>More options</span>
-                <div class="advanced">
-                   
-                </div>
-            </main>
-            <footer>
-                <button class="submit">Start your encounter</button>
-            </footer>
-        </div>
-    `);
-    };
+              <label>Paste the link to the map you'd like to use</label>
+              <input type='url' name="map" placeholder="https://..." required>
+              
+              <span class='more'>More options</span>
+              <div class="advanced">
+                 
+              </div>
+          </main>
+          <footer>
+              <button class="submit">Start your encounter</button>
+          </footer>
+      </div>
+    `;
+      },
+    });
 
-    const savesTlp = function(saves) {
-      return tpl(`
-        <h2>Your existing saves</h2>
-        <main>
-            ${saves.map((s) => {
+    const savesTlp = new Template({
+      'template': (saves) => {
+        return `
+      <h2>Your existing saves</h2>
+      <main>
+          ${saves.map((s) => {
     const map = s.substr(4);// Remove prefix
     return `<a href="?map=${map}"><img src="${map}"/></a>`;
   }).join('')}
-        </main>
-    `);
-    };
+      </main>
+    `;
+      },
+      'safe': false,
+    });
 
     var Wizard = Component$1.define({
       initialize: function(config) {
-        this.el = wizardTpl();
+        this.el = wizardTpl.render();
         document.body.appendChild(this.el);
         this.render();
       },
@@ -18297,7 +18357,7 @@
         // Do you have any saved maps?
         const saves = localData.getMaps();
         if (saves.length !== 0) {
-          const saveZone = savesTlp(saves);
+          const saveZone = savesTlp.render(saves);
           saveZone.className = 'save-zone';
           this.el.appendChild(saveZone);
         }

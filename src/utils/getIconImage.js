@@ -41,6 +41,10 @@ const getRandomPlayerIconList = function() {
 
 // Convert icon to image path
 export default function(icon) {
+  if (!icon) {
+    return '';
+  }
+
   if (icon.startsWith('icon:')) {
     return localData.getIcon(icon);
   }

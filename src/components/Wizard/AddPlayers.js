@@ -1,30 +1,37 @@
 import Component from 'lumpjs/src/component.js';
-import tpl from '../../utils/tpl.js';
+import Template from '../../utils/template.js';
 import getIconImage, {getRandomPlayerIcon, getRandomPlayerIconList} from '../../utils/getIconImage.js';
 import ImagePicker from '../Controls/imagePicker.js';
 
-const wizardPlayersTpl = function(player) {
-  return tpl(`
+
+const wizardPlayersTpl = new Template({
+  template: () => {
+    return `
         <h2>Players</h2>
         <div></div>
         <button>Add another player</button>
-    `);
-};
+    `;
+  },
+});
 
-const playerTpl = function(name, icon) {
-  return tpl(`
+const playerTpl = new Template({
+  template: (name, icon) => {
+    return `
         <span class="icon"><img src="${getIconImage(icon)}" data-id="${icon}"></span>
         <input type='text' name="name" value="${name}">
         <span class="remove">X</span>
-    `, 'player-option');
-};
+    `;
+  },
+  className: 'player-option',
+});
+
 
 const defaultPlayers = ['Caster', 'Tank', 'Rogue', 'Healer', 'Wizard'];
 
 export default Component.define({
   playerTarget: null,
   initialize: function(config) {
-    this.el = wizardPlayersTpl();
+    this.el = wizardPlayersTpl.render();
     this.picker = null;
 
     const icons = getRandomPlayerIconList();
@@ -48,7 +55,7 @@ export default Component.define({
   createPlayerRow: function(name = '', icon = null) {
     if (!icon) icon = getRandomPlayerIcon();
 
-    const nPlayer = playerTpl(name, icon);
+    const nPlayer = playerTpl.render(name, icon);
     this.playerTarget.appendChild(nPlayer);
   },
   openPickList: function(e, target) {

@@ -1,18 +1,18 @@
 import Component from 'lumpjs/src/component.js';
 import dragSort from '../utils/dragSort.js';
-import tpl from '../utils/tpl.js';
+import Template from '../utils/template.js';
 import getIconImage from '../utils/getIconImage.js';
 
 const playerMap = new WeakMap();
 
-const playerTpl = function(player) {
-  const template = tpl(`
-        <img src="${getIconImage(player.icon)}">
-        <span>${player.name}</span>
-    `);
-  playerMap.set(template, player);
-  return template;
-};
+const playerTpl = new Template({
+  template: (name, icon) => {
+    return `
+        <img src="${getIconImage(icon)}">
+        <span>${name}</span>
+    `;
+  },
+});
 
 export default Component.define({
   initialize: function(config) {
@@ -36,7 +36,9 @@ export default Component.define({
   },
   render: async function() {
     this.options.players.map((player, index) => {
-      const playerToken = playerTpl(player);
+      const playerToken = playerTpl.render(player.name, player.icon);
+      playerMap.set(playerToken, player);
+
       playerToken.setAttribute('title', player.name);
 
       if (player.spawned) playerToken.classList.add('spawned');
