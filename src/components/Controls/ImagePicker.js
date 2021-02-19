@@ -163,7 +163,7 @@ export default Component.define({
     }
   },
   render: async function() {
-    this.el.querySelector('main').innerHTML = iconList().innerHTML;
+    this.el.querySelector('main').innerHTML = iconList.render().innerHTML;
 
     if (this.prop.visible) {
       this.el.style.display = 'block';

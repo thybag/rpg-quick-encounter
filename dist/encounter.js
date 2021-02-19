@@ -17882,7 +17882,7 @@
         }
       },
       render: async function() {
-        this.el.querySelector('main').innerHTML = iconList$1().innerHTML;
+        this.el.querySelector('main').innerHTML = iconList$1.render().innerHTML;
 
         if (this.prop.visible) {
           this.el.style.display = 'block';
@@ -18176,7 +18176,7 @@
         }
       },
       render: async function() {
-        this.el.querySelector('main').innerHTML = iconList$2().innerHTML;
+        this.el.querySelector('main').innerHTML = iconList$2.render().innerHTML;
 
         if (this.prop.visible) {
           this.el.style.display = 'block';
