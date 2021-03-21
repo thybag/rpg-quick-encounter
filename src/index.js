@@ -46,6 +46,10 @@ if (!map) {
       clearSize: 36,
       mask: '',
     },
+    'icon': {
+      'tilesize': '60',
+      'mode': ''
+    },
     'data:version': 2,
   };
   component = Encounter.make({options, save: saving});

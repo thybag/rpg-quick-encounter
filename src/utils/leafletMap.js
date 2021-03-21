@@ -15,9 +15,8 @@ export default async function(target, mapPath) {
   const width = Math.round(img.width / 10);
   const height = Math.round(img.height / 10);
   const bounds = [[0, 0], [height, width]];
-
+ 
   L.imageOverlay(mapPath, bounds).addTo(map);
-
   map.fitBounds(bounds);
 
   // Config defualt map zoom.
