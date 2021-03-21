@@ -17,7 +17,7 @@ function makeIcon(name, icon) {
     className: 'character-icon',
     html: iconTpl.render(name, icon),
     iconSize: [60, 80],
-    iconAnchor: [35, 35],
+    iconAnchor: [1, 1],
   });
 }
 
@@ -42,6 +42,9 @@ export default Component.define({
     'marker:dblclick': 'characterDblClick',
     'marker:dragend': 'characterDragend',
     'marker:contextmenu': 'characterRemove',
+    'marker:zoom': 'zoom',
+    'marker:zoomend': 'zoomend',
+    'marker:zoomstart': 'zoomstart'
   },
   initialize: function({ref, map}) {
     // Store key vals
@@ -55,6 +58,11 @@ export default Component.define({
     this.marker.on('dblclick', (e) => this.trigger('marker:dblclick', e));
     this.marker.on('dragend', (e) => this.trigger('marker:dragend', e));
     this.marker.on('contextmenu', (e) => this.trigger('marker:contextmenu', e));
+
+    this.map.on('zoom', (e) => this.trigger('marker:zoom', e));
+    this.map.on('zoomend', (e) => this.trigger('marker:zoomend', e));
+    this.map.on('zoomstart', (e) => this.trigger('marker:zoomstart', e));
+
     this.render();
   },
   panTo: function() {
@@ -63,6 +71,47 @@ export default Component.define({
   characterClick: function(event) {
     event.preventDefault;
     console.log('click me');
+  },
+  zoomend: function(event)
+  {
+    return;
+    console.log(event);
+    const mapImg = event.target._container.querySelector('.leaflet-image-layer');
+    const ratio = mapImg.width/mapImg.naturalWidth;
+
+    console.log(mapImg.width, mapImg.naturalWidth, ratio);
+    this.marker._icon.style.opacity = '1';
+    this.marker._icon.style.width = 75*ratio+'px';
+
+    const offset = (75*ratio-80)/2;
+     this.marker._icon.querySelector('span').style.marginLeft = offset+'px';
+     this.marker._icon.querySelector('span').style.width = '80px';
+
+   // this.map.
+  },
+  zoomstart: function() {
+    return;
+     this.marker._icon.style.opacity = '0';
+
+  },
+  zoom: function() {
+    
+    return;
+    // Size options
+    // 
+    // fixed - always same size
+    // 
+    // scaled - sized to fit map tiles
+     console.log(this.map.getSize(),"wd",this.map.getZoom(), this.map.getZoom()*(60/10));
+     let ptToPx = Math.abs(this.map.latLngToLayerPoint([1,1]).x - this.map.latLngToLayerPoint([1,10]).x);
+     ptToPx = ptToPx/100;
+     const nIconSize = (75*ptToPx);
+     console.log("px:",nIconSize+'px');
+     this.marker._icon.style.width = nIconSize+'px';
+
+     // Name box is 80px min. So work out new size
+     
+
   },
   characterDblClick: function(event) {
     event.preventDefault;
