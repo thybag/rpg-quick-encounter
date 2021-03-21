@@ -25,7 +25,7 @@ export default Component.define({
 
     // Get config or load from local storage
     if (localData.hasMap(options.map) && config.save !== 'false') {
-       options = localData.loadMap(options.map);
+      options = localData.loadMap(options.map);
     }
 
     // Set global state

@@ -43,7 +43,7 @@ const getRandomPlayerIconList = function() {
 // Change icon path if being used via another app
 const setIconPath = function(path) {
   iconPath = path;
-}
+};
 
 // Convert icon to image path
 export default function(icon) {
@@ -71,5 +71,5 @@ export {
   getPlayerIcons,
   getMonsterIcons,
   getCustomIcons,
-  setIconPath
+  setIconPath,
 };

@@ -13,7 +13,7 @@ const base = {
   },
   'icon': {
     'tilesize': '60',
-    'mode': 'default'
+    'mode': 'default',
   },
   'data:version': 2,
 };
@@ -21,7 +21,7 @@ const base = {
 function applySettings(base, overrides) {
   for (const [key, value] of Object.entries(overrides)) {
     if (typeof value === 'object' && value !== null) {
-      base[key] = applySettings(base[key] ?? {}, value)
+      base[key] = applySettings(base[key] ?? {}, value);
     } else {
       base[key] = value;
     }
