@@ -3,6 +3,7 @@ import localData from '../services/localData.js';
 // Player icons
 const playerIcons = 9;
 const monsterIcons = 33;
+let iconPath = 'assets/';
 
 const iconList = []; const monsterList = [];
 
@@ -39,6 +40,11 @@ const getRandomPlayerIconList = function() {
   return iconList.sort(() => Math.random() - 0.5);
 };
 
+// Change icon path if being used via another app
+const setIconPath = function(path) {
+  iconPath = path;
+}
+
 // Convert icon to image path
 export default function(icon) {
   if (!icon) {
@@ -49,10 +55,10 @@ export default function(icon) {
     return localData.getIcon(icon);
   }
   if (icon.startsWith('p:')) {
-    return `assets/players/${icon.substr(2)}.png`;
+    return `${iconPath}players/${icon.substr(2)}.png`;
   }
   if (icon.startsWith('m:')) {
-    return `assets/monsters/${icon.substr(2)}.png`;
+    return `${iconPath}monsters/${icon.substr(2)}.png`;
   }
 
   return icon;
@@ -65,4 +71,5 @@ export {
   getPlayerIcons,
   getMonsterIcons,
   getCustomIcons,
+  setIconPath
 };

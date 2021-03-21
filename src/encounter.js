@@ -6,12 +6,17 @@ import Players from './components/PlayerBar.js';
 import Controls from './components/Controls.js';
 
 import localData from './services/localData.js';
+import {setIconPath} from './utils/getIconImage.js';
 
 export default Component.define({
   initialize: function(config) {
     // Take control of root
     this.el = document.querySelector('body');
     this.el.classList = 'app';
+
+    if (config.options.assetPath) {
+      setIconPath(config.options.assetPath);
+    }
 
     // Get config or load from local storage
     if (localData.hasMap(config.options.map) && config.save !== 'false') {

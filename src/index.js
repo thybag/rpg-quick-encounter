@@ -48,7 +48,7 @@ if (!map) {
     },
     'icon': {
       'tilesize': '60',
-      'mode': ''
+      'mode': 'default'
     },
     'data:version': 2,
   };
