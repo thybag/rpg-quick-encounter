@@ -17,7 +17,7 @@ export default Component.define({
     this.el.classList = 'app';
 
     // Apply defaults and sanity check
-    const options = applyDefaults(config.options);
+    let options = applyDefaults(config.options);
 
     if (options.assetPath) {
       setIconPath(options.assetPath);
@@ -25,7 +25,7 @@ export default Component.define({
 
     // Get config or load from local storage
     if (localData.hasMap(options.map) && config.save !== 'false') {
-      config.options = localData.loadMap(options.map);
+       options = localData.loadMap(options.map);
     }
 
     // Set global state

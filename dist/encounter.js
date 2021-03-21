@@ -178,15 +178,13 @@
 
         // Create watcher proxy
         function newProxy(result, context) {
-            // Don't attempt to proxy nulls
-            if (result === null) return null;
-
             const proxyTraps =  {
                 get: function(obj, prop, receiver)
                 {
                     let ctx = context ? context + '.' + prop : prop;
                     let result = Reflect.get(obj, prop);
-                    if (typeof result === 'object') {
+
+                    if (parent.isObject(result)) {
                         result = newProxy(result, ctx);
                     }
 
@@ -298,15 +296,23 @@
     {
         return (typeof data == 'object') ? JSON.parse(JSON.stringify(data)) : data;
     };
+
     // Detect change type for a primative
     Model.prototype.detectChangeType = function(original, updated)
     {
-        if(!original && original !== false) return "CREATE"; // additional key added to our new data
-        if(!updated && updated !== false) return "REMOVE"; // old key removed from our new data
+        if(typeof original === 'undefined') return "CREATE"; // additional key added to our new data
+        if(typeof updated === 'undefined') return "REMOVE"; // old key removed from our new data
         if(original==updated) return "NONE"; // data unchanged between the two keys
 
         return "UPDATE"; // A mix - so an update
     };
+
+    // Detect objects that are not NULL values
+    Model.prototype.isObject = function (value)
+    {
+       return (typeof value === 'object' && value !== null);
+    };
+
     // Detect changes in watched data
     Model.prototype.detectChanges = function (keys, original, updated, namespace = '')
     {
@@ -326,7 +332,7 @@
         // Target depth reached.
         if (keys.length == 0) {
             // Detect attribute changes to children
-            if (typeof updated == 'object' || typeof original == 'object') {
+            if (this.isObject(updated) ||this.isObject(original)) {
                 // Check for field changes
                 let fields = new Set([
                     ...(updated) ? Object.keys(updated) : [],
@@ -14473,9 +14479,8 @@
       const width = Math.round(img.width / 10);
       const height = Math.round(img.height / 10);
       const bounds = [[0, 0], [height, width]];
-
+     
       leafletSrc.imageOverlay(mapPath, bounds).addTo(map);
-
       map.fitBounds(bounds);
 
       // Config defualt map zoom.
@@ -17331,6 +17336,7 @@
     // Player icons
     const playerIcons = 9;
     const monsterIcons = 33;
+    let iconPath = 'assets/';
 
     const iconList = []; const monsterList = [];
 
@@ -17367,6 +17373,11 @@
       return iconList.sort(() => Math.random() - 0.5);
     };
 
+    // Change icon path if being used via another app
+    const setIconPath = function(path) {
+      iconPath = path;
+    };
+
     // Convert icon to image path
     function getIconImage(icon) {
       if (!icon) {
@@ -17377,10 +17388,10 @@
         return localData.getIcon(icon);
       }
       if (icon.startsWith('p:')) {
-        return `assets/players/${icon.substr(2)}.png`;
+        return `${iconPath}players/${icon.substr(2)}.png`;
       }
       if (icon.startsWith('m:')) {
-        return `assets/monsters/${icon.substr(2)}.png`;
+        return `${iconPath}monsters/${icon.substr(2)}.png`;
       }
 
       return icon;
@@ -17978,19 +17989,61 @@
       },
     });
 
+    const base = {
+      'container': '#map',
+      'playerBar': '#player-bar',
+      'controlBar': '#control-bar',
+      'map': null,
+      'players': [],
+      'spawns': [],
+      'fog': {
+        enabled: true,
+        opacity: 70,
+        clearSize: 36,
+        mask: '',
+      },
+      'icon': {
+        'tilesize': '60',
+        'mode': 'default'
+      },
+      'data:version': 2,
+    };
+
+    function applySettings(base, overrides) {
+      for (const [key, value] of Object.entries(overrides)) {
+        if (typeof value === 'object' && value !== null) {
+          base[key] = applySettings(base[key] ?? {}, value);
+        } else {
+          base[key] = value;
+        }
+      }
+      return base;
+    }
+
+    function applyDefaults(options) {
+      return applySettings(base, options);
+    }
+
     var Encounter = Component$1.define({
       initialize: function(config) {
         // Take control of root
         this.el = document.querySelector('body');
         this.el.classList = 'app';
 
+        // Apply defaults and sanity check
+        let options = applyDefaults(config.options);
+
+        if (options.assetPath) {
+          setIconPath(options.assetPath);
+        }
+
         // Get config or load from local storage
-        if (localData.hasMap(config.options.map) && config.save !== 'false') {
-          config.options = localData.loadMap(config.options.map);
+        if (localData.hasMap(options.map) && config.save !== 'false') {
+           options = localData.loadMap(options.map);
         }
 
         // Set global state
-        const props = new Model(config.options);
+        const props = new Model(options);
 
         const map = EncounterMap.make({options: props.data, bus: props});
         const players = Players.make({options: props.data, bus: props});
@@ -18389,20 +18442,12 @@
     } else {
       // Basic setup for standalone
       const options = {
-        'container': '#map',
-        'playerBar': '#player-bar',
-        'controlBar': '#control-bar',
         'map': map,
         // Setup default images if none provided
         'players': configurePlayers(players),
-        'spawns': [],
         'fog': {
           enabled: !(fog$1 && fog$1 == 'false'),
-          opacity: 70,
-          clearSize: 36,
-          mask: '',
         },
-        'data:version': 2,
       };
       component = Encounter.make({options, save: saving});
     }
