@@ -6,6 +6,8 @@ import Players from './components/PlayerBar.js';
 import Controls from './components/Controls.js';
 
 import localData from './services/localData.js';
+
+import applyDefaults from './utils/applyDefaults.js';
 import {setIconPath} from './utils/getIconImage.js';
 
 export default Component.define({
@@ -14,17 +16,20 @@ export default Component.define({
     this.el = document.querySelector('body');
     this.el.classList = 'app';
 
-    if (config.options.assetPath) {
-      setIconPath(config.options.assetPath);
+    // Apply defaults and sanity check
+    const options = applyDefaults(config.options);
+
+    if (options.assetPath) {
+      setIconPath(options.assetPath);
     }
 
     // Get config or load from local storage
-    if (localData.hasMap(config.options.map) && config.save !== 'false') {
-      config.options = localData.loadMap(config.options.map);
+    if (localData.hasMap(options.map) && config.save !== 'false') {
+      config.options = localData.loadMap(options.map);
     }
 
     // Set global state
-    const props = new Model(config.options);
+    const props = new Model(options);
 
     const map = EncounterMap.make({options: props.data, bus: props});
     const players = Players.make({options: props.data, bus: props});

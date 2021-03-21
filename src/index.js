@@ -33,24 +33,12 @@ if (!map) {
 } else {
   // Basic setup for standalone
   const options = {
-    'container': '#map',
-    'playerBar': '#player-bar',
-    'controlBar': '#control-bar',
     'map': map,
     // Setup default images if none provided
     'players': configurePlayers(players),
-    'spawns': [],
     'fog': {
       enabled: !(fog && fog == 'false'),
-      opacity: 70,
-      clearSize: 36,
-      mask: '',
     },
-    'icon': {
-      'tilesize': '60',
-      'mode': 'default'
-    },
-    'data:version': 2,
   };
   component = Encounter.make({options, save: saving});
 }
