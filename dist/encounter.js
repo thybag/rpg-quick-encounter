@@ -17471,6 +17471,7 @@
       characterDblClick: function(event) {
         event.preventDefault;
         // Going old school for now
+        this.state.trigger('edit:charicter', this.ref);
         const name = prompt('Rename?', this.ref.name);
         if (name) {
           event.target._icon.querySelector('span').innerText = this.ref.name = name;
@@ -17938,25 +17939,30 @@
       },
       prop: {
         visible: false,
+        mode: 'spawn',
+        target: null
       },
       events: {
         'click img': 'openPickList',
-        'click input[type=submit]': 'spawn',
+        'click input[type=submit]': 'save',
       },
       openPickList: function(e, target) {
         if (!this.picker) this.picker = ImagePicker.make();
         this.picker.open(target);
       },
-      spawn: function(e, target) {
+      save: function(e, target) {
         // default
-        this.trigger('map:spawn', {name: this.el.querySelector('input[type=text]').value, icon: this.el.querySelector('img').dataset.id});
+        if (this.prop.mode == 'spawn') {
+          this.trigger('map:spawn', {name: this.el.querySelector('input[type=text]').value, icon: this.el.querySelector('img').dataset.id});
+        } 
+        if (this.prop.mode == 'edit') ;    
       },
       toggle: function() {
-        this.prop.visible = !this.prop.visible;
-        this.render();
+        this.prop.visible ? this.hide() : this.show();
       },
-      show: function() {
+      show: function(mode = 'spawn') {
         this.prop.visible = true;
+        this.prop.mode = mode;
         this.render();
       },
       hide: function() {
@@ -17968,6 +17974,12 @@
           this.el.style.display = 'block';
         } else {
           this.el.style.display = 'none';
+        }
+
+        if (this.prop.mode == 'spawn') {
+          this.el.querySelector('submit').value = 'Spawn';
+        } else {
+          this.el.querySelector('submit').value = 'Save';
         }
       },
     });
@@ -18068,6 +18080,8 @@
         players.on('map:player:focus', function(player) {
           map.trigger('map:player:focus', player);
         });
+
+        map.on('aaa');
 
         controls.on('map:spawn', function(v) {
           const spawn = {
@@ -18289,8 +18303,6 @@
         this.playerTarget = this.el.querySelector('div');
 
         const players = localData.getPlayers() || defaultPlayers;
-        console.log(players);
-
         players.forEach((p, idx) => {
           this.createPlayerRow({name: p.name, icon: p.icon || icons[idx]});
         });

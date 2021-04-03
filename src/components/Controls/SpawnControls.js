@@ -28,25 +28,32 @@ export default Component.define({
   },
   prop: {
     visible: false,
+    mode: 'spawn',
+    target: null
   },
   events: {
     'click img': 'openPickList',
-    'click input[type=submit]': 'spawn',
+    'click input[type=submit]': 'save',
   },
   openPickList: function(e, target) {
     if (!this.picker) this.picker = ImagePicker.make();
     this.picker.open(target);
   },
-  spawn: function(e, target) {
+  save: function(e, target) {
     // default
-    this.trigger('map:spawn', {name: this.el.querySelector('input[type=text]').value, icon: this.el.querySelector('img').dataset.id});
+    if (this.prop.mode == 'spawn') {
+      this.trigger('map:spawn', {name: this.el.querySelector('input[type=text]').value, icon: this.el.querySelector('img').dataset.id});
+    } 
+    if (this.prop.mode == 'edit') {
+
+    }    
   },
   toggle: function() {
-    this.prop.visible = !this.prop.visible;
-    this.render();
+    this.prop.visible ? this.hide() : this.show();
   },
-  show: function() {
+  show: function(mode = 'spawn') {
     this.prop.visible = true;
+    this.prop.mode = mode;
     this.render();
   },
   hide: function() {
@@ -58,6 +65,12 @@ export default Component.define({
       this.el.style.display = 'block';
     } else {
       this.el.style.display = 'none';
+    }
+
+    if (this.prop.mode == 'spawn') {
+      this.el.querySelector('submit').value = 'Spawn';
+    } else {
+      this.el.querySelector('submit').value = 'Save';
     }
   },
 });

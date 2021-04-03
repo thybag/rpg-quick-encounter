@@ -45,6 +45,8 @@ export default Component.define({
       map.trigger('map:player:focus', player);
     });
 
+    map.on('aaa')
+
     controls.on('map:spawn', function(v) {
       const spawn = {
         ...v,

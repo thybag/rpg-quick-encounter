@@ -44,8 +44,6 @@ export default Component.define({
     this.playerTarget = this.el.querySelector('div');
 
     const players = localData.getPlayers() || defaultPlayers;
-    console.log(players);
-
     players.forEach((p, idx) => {
       this.createPlayerRow({name: p.name, icon: p.icon || icons[idx]});
     });
