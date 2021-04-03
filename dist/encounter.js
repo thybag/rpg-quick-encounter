@@ -17332,15 +17332,14 @@
 
       };
 
-      this.setPlayers = function(players){
+      this.setPlayers = function(players) {
         storage.setItem('players', JSON.stringify(players));
       };
 
-      this.getPlayers = function(){
+      this.getPlayers = function() {
         const players = JSON.parse(storage.getItem('players'));
         return players || null;
       };
-
     };
 
     // Player icons
@@ -18272,11 +18271,11 @@
 
 
     const defaultPlayers = [
-      {name:'Caster'},
-      {name:'Tank'},
-      {name:'Rogue'},
-      {name:'Healer'},
-      {name:'Fighter'},
+      {name: 'Caster'},
+      {name: 'Tank'},
+      {name: 'Rogue'},
+      {name: 'Healer'},
+      {name: 'Fighter'},
     ];
 
     var AddPlayers = Component$1.define({
@@ -18289,7 +18288,6 @@
         this.playerTarget = this.el.querySelector('div');
 
         const players = localData.getPlayers() || defaultPlayers;
-        console.log(players);
 
         players.forEach((p, idx) => {
           this.createPlayerRow({name: p.name, icon: p.icon || icons[idx]});

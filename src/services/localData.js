@@ -46,13 +46,12 @@ export default new function() {
 
   };
 
-  this.setPlayers = function(players){
+  this.setPlayers = function(players) {
     storage.setItem('players', JSON.stringify(players));
-  }
+  };
 
-  this.getPlayers = function(){
+  this.getPlayers = function() {
     const players = JSON.parse(storage.getItem('players'));
     return players || null;
-  }
-
+  };
 };
