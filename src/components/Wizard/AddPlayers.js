@@ -1,8 +1,8 @@
 import Component from 'lumpjs/src/component.js';
 import Template from '../../utils/template.js';
+import localData from '../../services/localData.js';
 import getIconImage, {getRandomPlayerIcon, getRandomPlayerIconList} from '../../utils/getIconImage.js';
 import ImagePicker from '../Controls/imagePicker.js';
-
 
 const wizardPlayersTpl = new Template({
   template: () => {
@@ -26,7 +26,13 @@ const playerTpl = new Template({
 });
 
 
-const defaultPlayers = ['Caster', 'Tank', 'Rogue', 'Healer', 'Wizard'];
+const defaultPlayers = [
+  {name:'Caster'},
+  {name:'Tank'},
+  {name:'Rogue'},
+  {name:'Healer'},
+  {name:'Fighter'},
+];
 
 export default Component.define({
   playerTarget: null,
@@ -37,8 +43,11 @@ export default Component.define({
     const icons = getRandomPlayerIconList();
     this.playerTarget = this.el.querySelector('div');
 
-    defaultPlayers.forEach((p, idx) => {
-      this.createPlayerRow(p, icons[idx]);
+    const players = localData.getPlayers() || defaultPlayers;
+    console.log(players);
+
+    players.forEach((p, idx) => {
+      this.createPlayerRow({name: p.name, icon: p.icon || icons[idx]});
     });
   },
   events: {
@@ -52,7 +61,7 @@ export default Component.define({
   removePlayer: function(e, target) {
     target.parentNode.remove();
   },
-  createPlayerRow: function(name = '', icon = null) {
+  createPlayerRow: function({name = '', icon = null}) {
     if (!icon) icon = getRandomPlayerIcon();
 
     const nPlayer = playerTpl.render(name, icon);
@@ -64,10 +73,16 @@ export default Component.define({
   },
   toUrlString: function() {
     const parts = [];
+    const players = [];
 
     for (const node of this.playerTarget.children) {
-      parts.push(`${node.querySelector('input').value}|${node.querySelector('img').dataset.id}`);
+      const player = {name: node.querySelector('input').value, icon: node.querySelector('img').dataset.id};
+
+      players.push(player)
+      parts.push(`${player.name}|${player.icon}`);
     }
+
+    localData.setPlayers(players);
     return '&players=' + parts.join(',');
   },
   render: async function() {
