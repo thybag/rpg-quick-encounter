@@ -27,11 +27,11 @@ const playerTpl = new Template({
 
 
 const defaultPlayers = [
-  {name:'Caster'},
-  {name:'Tank'},
-  {name:'Rogue'},
-  {name:'Healer'},
-  {name:'Fighter'},
+  {name: 'Caster'},
+  {name: 'Tank'},
+  {name: 'Rogue'},
+  {name: 'Healer'},
+  {name: 'Fighter'},
 ];
 
 export default Component.define({
@@ -44,6 +44,7 @@ export default Component.define({
     this.playerTarget = this.el.querySelector('div');
 
     const players = localData.getPlayers() || defaultPlayers;
+
     players.forEach((p, idx) => {
       this.createPlayerRow({name: p.name, icon: p.icon || icons[idx]});
     });
@@ -54,7 +55,7 @@ export default Component.define({
     'click .remove': 'removePlayer',
   },
   addPlayer: function() {
-    this.createPlayerRow();
+    this.createPlayerRow({});
   },
   removePlayer: function(e, target) {
     target.parentNode.remove();
@@ -76,7 +77,7 @@ export default Component.define({
     for (const node of this.playerTarget.children) {
       const player = {name: node.querySelector('input').value, icon: node.querySelector('img').dataset.id};
 
-      players.push(player)
+      players.push(player);
       parts.push(`${player.name}|${player.icon}`);
     }
 
