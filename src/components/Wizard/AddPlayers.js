@@ -55,7 +55,7 @@ export default Component.define({
     'click .remove': 'removePlayer',
   },
   addPlayer: function() {
-    this.createPlayerRow();
+    this.createPlayerRow({});
   },
   removePlayer: function(e, target) {
     target.parentNode.remove();
