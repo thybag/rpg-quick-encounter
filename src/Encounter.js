@@ -10,33 +10,34 @@ import localData from './services/localData.js';
 import applyDefaults from './utils/applyDefaults.js';
 import {setIconPath} from './utils/getIconImage.js';
 
+import {setState} from './utils/state.js';
+
 export default Component.define({
   initialize: function(config) {
     // Take control of root
     this.el = document.querySelector('body');
     this.el.classList = 'app';
 
+    console.log(config.options);
     // Apply defaults and sanity check
     let options = applyDefaults(config.options);
-
+    console.log(options);
     if (options.assetPath) {
       setIconPath(options.assetPath);
     }
 
     // Get config or load from local storage
     if (localData.hasMap(options.map) && config.save !== 'false') {
-      options = localData.loadMap(options.map);
+      options.data = localData.loadMap(options.map);
     }
 
     // Set global state
     const props = new Model(options);
+    setState(props);
 
-    const map = EncounterMap.make({options: props.data, bus: props});
-    const players = Players.make({options: props.data, bus: props});
-    const controls = Controls.make({options: props.data, bus: props});
-
-    // Pass model eventing
-    map.listenTo(props);
+    const map = EncounterMap.make({});
+    const players = Players.make({});
+    const controls = Controls.make({});
 
     players.on('map:player:spawn', function(player) {
       map.trigger('map:player:spawn', player);
@@ -61,7 +62,7 @@ export default Component.define({
 
     // Save local storage
     props.on('updated', () => {
-      localData.saveMap(config.options.map, props.data);
+      localData.saveMap(config.options.map, props.data.data);
     });
   },
 });

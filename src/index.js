@@ -34,12 +34,14 @@ if (!map) {
 } else {
   // Basic setup for standalone
   const options = {
-    'map': map,
-    // Setup default images if none provided
-    'players': configurePlayers(players),
-    'fog': {
-      enabled: !(fog && fog == 'false'),
-    },
+    data: {
+      'map': map,
+      // Setup default images if none provided
+      'players': configurePlayers(players),
+      'fog': {
+        enabled: !(fog && fog == 'false'),
+      },
+    }
   };
   component = Encounter.make({options, save: saving});
 }

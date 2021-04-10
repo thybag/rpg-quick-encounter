@@ -2,16 +2,29 @@ import Component from 'lumpjs/src/component.js';
 import createMap from '../utils/leafletMap.js';
 import fogOfWar from '../utils/fogOfWar.js';
 import Character from './Map/Character.js';
+import {getState} from '../utils/state.js';
 
 const playerToIconMap = {};
 const npcToIconMap = {};
 
+/**
+ * Map Component
+ * 
+ * @param  {[type]}
+ * @return {Component}
+ */
 export default Component.define({
   map: null,
   fog: null,
-  initialize: function(config) {
-    this.el = document.querySelector(config.options.container);
+  initialize: function() {
+
+    this.options = getState().get('data');
+
+    // Pass model eventing
+    this.el = document.querySelector(getState().get('config.container'));
     this.render();
+
+    this.listenTo(getState());
   },
   events: {
     'map:player:spawn': 'spawnPlayer',

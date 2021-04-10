@@ -1,21 +1,28 @@
 const base = {
-  'container': '#map',
-  'playerBar': '#player-bar',
-  'controlBar': '#control-bar',
-  'map': null,
-  'players': [],
-  'spawns': [],
-  'fog': {
-    enabled: true,
-    opacity: 70,
-    clearSize: 36,
-    mask: '',
+  // App config
+  config: {
+    'container': '#map',
+    'playerBar': '#player-bar',
+    'controlBar': '#control-bar',
+    'assetPath': 'assets/'
   },
-  'icon': {
-    'tilesize': '60',
-    'mode': 'default',
-  },
-  'data:version': 2,
+  // Encounter data
+  data: {
+    'map': null,
+    'players': [],
+    'spawns': [],
+    'fog': {
+      enabled: true,
+      opacity: 70,
+      clearSize: 36,
+      mask: '',
+    },
+    'icon': {
+      'tilesize': '60',
+      'mode': 'default',
+    },
+    'data:version': 3,
+  }
 };
 
 function applySettings(base, overrides) {

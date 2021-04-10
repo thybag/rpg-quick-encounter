@@ -1,11 +1,13 @@
 import Component from 'lumpjs/src/component.js';
 import FogControls from './Controls/FogControls.js';
 import SpawnControls from './Controls/SpawnControls.js';
+import {getState} from '../utils/state.js';
 
 export default Component.define({
   initialize: function(config) {
-    this.el = document.querySelector(config.options.controlBar);
-    this.fogControls = FogControls.make({fogProps: config.options.fog});
+
+    this.el = document.querySelector(getState().get('config.controlBar'));
+    this.fogControls = FogControls.make({fogProps: getState().get('data.fog')});
     this.spawnControls = SpawnControls.make();
     this.render();
 
@@ -13,6 +15,7 @@ export default Component.define({
     this.spawnControls.on('map:spawn', (v) => {
       this.trigger('map:spawn', v);
     });
+
   },
   events: {
     'click span.fog': 'fogToggle',

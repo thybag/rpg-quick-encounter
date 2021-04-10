@@ -18,7 +18,6 @@ export default async function(target, mapPath) {
 
   L.imageOverlay(mapPath, bounds).addTo(map);
   map.fitBounds(bounds);
-
   // Config defualt map zoom.
   const zoom = map.getZoom();
   map.setZoom(zoom + 0.5);

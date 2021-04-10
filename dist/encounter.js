@@ -14482,7 +14482,6 @@
 
       leafletSrc.imageOverlay(mapPath, bounds).addTo(map);
       map.fitBounds(bounds);
-
       // Config defualt map zoom.
       const zoom = map.getZoom();
       map.setZoom(zoom + 0.5);
@@ -17470,7 +17469,7 @@
       characterDblClick: function(event) {
         event.preventDefault;
         // Going old school for now
-        this.state.trigger('edit:charicter', this.ref);
+       
         const name = prompt('Rename?', this.ref.name);
         if (name) {
           event.target._icon.querySelector('span').innerText = this.ref.name = name;
@@ -17495,15 +17494,37 @@
       },
     });
 
+    let state;
+
+    const getState = function() {
+    	return state;
+    };
+
+    const setState = function(newState) {
+    	state = newState;
+    };
+
     const playerToIconMap = {};
     const npcToIconMap = {};
 
+    /**
+     * Map Component
+     * 
+     * @param  {[type]}
+     * @return {Component}
+     */
     var EncounterMap = Component$1.define({
       map: null,
       fog: null,
-      initialize: function(config) {
-        this.el = document.querySelector(config.options.container);
+      initialize: function() {
+
+        this.options = getState().get('data');
+
+        // Pass model eventing
+        this.el = document.querySelector(getState().get('config.container'));
         this.render();
+
+        this.listenTo(getState());
       },
       events: {
         'map:player:spawn': 'spawnPlayer',
@@ -17636,7 +17657,8 @@
 
     var Players = Component$1.define({
       initialize: function(config) {
-        this.el = document.querySelector(config.options.playerBar);
+        this.options = getState().get('data.players');
+        this.el = document.querySelector(getState().get('config.playerBar'));
         this.render();
       },
       events: {
@@ -17655,7 +17677,7 @@
         this.trigger('map:player:focus', player);
       },
       render: async function() {
-        this.options.players.map((player, index) => {
+        this.options.map((player, index) => {
           const playerToken = playerTpl.render(player.name, player.icon);
           playerMap.set(playerToken, player);
 
@@ -17664,12 +17686,12 @@
           if (player.spawned) playerToken.classList.add('spawned');
 
           // Listen for name changes
-          this.bus.on(`update:players.${index}.name`, (newName) => {
+          getState().on(`update:data.players.${index}.name`, (newName) => {
             playerToken.querySelector('span').innerText = newName;
             playerToken.setAttribute('title', newName);
           });
 
-          this.bus.on(`update:players.${index}.spawned`, (spawned) => {
+          getState().on(`update:data.players.${index}.spawned`, (spawned) => {
             if (spawned) {
               playerToken.classList.add('spawned');
             } else {
@@ -17985,8 +18007,9 @@
 
     var Controls = Component$1.define({
       initialize: function(config) {
-        this.el = document.querySelector(config.options.controlBar);
-        this.fogControls = FogControls.make({fogProps: config.options.fog});
+
+        this.el = document.querySelector(getState().get('config.controlBar'));
+        this.fogControls = FogControls.make({fogProps: getState().get('data.fog')});
         this.spawnControls = SpawnControls.make();
         this.render();
 
@@ -17994,6 +18017,7 @@
         this.spawnControls.on('map:spawn', (v) => {
           this.trigger('map:spawn', v);
         });
+
       },
       events: {
         'click span.fog': 'fogToggle',
@@ -18011,23 +18035,30 @@
     });
 
     const base = {
-      'container': '#map',
-      'playerBar': '#player-bar',
-      'controlBar': '#control-bar',
-      'map': null,
-      'players': [],
-      'spawns': [],
-      'fog': {
-        enabled: true,
-        opacity: 70,
-        clearSize: 36,
-        mask: '',
+      // App config
+      config: {
+        'container': '#map',
+        'playerBar': '#player-bar',
+        'controlBar': '#control-bar',
+        'assetPath': 'assets/'
       },
-      'icon': {
-        'tilesize': '60',
-        'mode': 'default',
-      },
-      'data:version': 2,
+      // Encounter data
+      data: {
+        'map': null,
+        'players': [],
+        'spawns': [],
+        'fog': {
+          enabled: true,
+          opacity: 70,
+          clearSize: 36,
+          mask: '',
+        },
+        'icon': {
+          'tilesize': '60',
+          'mode': 'default',
+        },
+        'data:version': 3,
+      }
     };
 
     function applySettings(base, overrides) {
@@ -18051,27 +18082,26 @@
         this.el = document.querySelector('body');
         this.el.classList = 'app';
 
+        console.log(config.options);
         // Apply defaults and sanity check
         let options = applyDefaults(config.options);
-
+        console.log(options);
         if (options.assetPath) {
           setIconPath(options.assetPath);
         }
 
         // Get config or load from local storage
         if (localData.hasMap(options.map) && config.save !== 'false') {
-          options = localData.loadMap(options.map);
+          options.data = localData.loadMap(options.map);
         }
 
         // Set global state
         const props = new Model(options);
+        setState(props);
 
-        const map = EncounterMap.make({options: props.data, bus: props});
-        const players = Players.make({options: props.data, bus: props});
-        const controls = Controls.make({options: props.data, bus: props});
-
-        // Pass model eventing
-        map.listenTo(props);
+        const map = EncounterMap.make({});
+        const players = Players.make({});
+        const controls = Controls.make({});
 
         players.on('map:player:spawn', function(player) {
           map.trigger('map:player:spawn', player);
@@ -18096,7 +18126,7 @@
 
         // Save local storage
         props.on('updated', () => {
-          localData.saveMap(config.options.map, props.data);
+          localData.saveMap(config.options.map, props.data.data);
         });
       },
     });
@@ -18479,12 +18509,14 @@
     } else {
       // Basic setup for standalone
       const options = {
-        'map': map,
-        // Setup default images if none provided
-        'players': configurePlayers(players),
-        'fog': {
-          enabled: !(fog$1 && fog$1 == 'false'),
-        },
+        data: {
+          'map': map,
+          // Setup default images if none provided
+          'players': configurePlayers(players),
+          'fog': {
+            enabled: !(fog$1 && fog$1 == 'false'),
+          },
+        }
       };
       component = Encounter.make({options, save: saving});
     }

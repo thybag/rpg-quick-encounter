@@ -67,7 +67,7 @@ export default Component.define({
   characterDblClick: function(event) {
     event.preventDefault;
     // Going old school for now
-    this.state.trigger('edit:charicter', this.ref);
+   
     const name = prompt('Rename?', this.ref.name);
     if (name) {
       event.target._icon.querySelector('span').innerText = this.ref.name = name;

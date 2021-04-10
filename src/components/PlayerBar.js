@@ -2,6 +2,7 @@ import Component from 'lumpjs/src/component.js';
 import dragSort from '../utils/dragSort.js';
 import Template from '../utils/template.js';
 import getIconImage from '../utils/getIconImage.js';
+import {getState} from '../utils/state.js';
 
 const playerMap = new WeakMap();
 
@@ -16,7 +17,8 @@ const playerTpl = new Template({
 
 export default Component.define({
   initialize: function(config) {
-    this.el = document.querySelector(config.options.playerBar);
+    this.options = getState().get('data.players');
+    this.el = document.querySelector(getState().get('config.playerBar'));
     this.render();
   },
   events: {
@@ -35,7 +37,7 @@ export default Component.define({
     this.trigger('map:player:focus', player);
   },
   render: async function() {
-    this.options.players.map((player, index) => {
+    this.options.map((player, index) => {
       const playerToken = playerTpl.render(player.name, player.icon);
       playerMap.set(playerToken, player);
 
@@ -44,12 +46,12 @@ export default Component.define({
       if (player.spawned) playerToken.classList.add('spawned');
 
       // Listen for name changes
-      this.bus.on(`update:players.${index}.name`, (newName) => {
+      getState().on(`update:data.players.${index}.name`, (newName) => {
         playerToken.querySelector('span').innerText = newName;
         playerToken.setAttribute('title', newName);
       });
 
-      this.bus.on(`update:players.${index}.spawned`, (spawned) => {
+      getState().on(`update:data.players.${index}.spawned`, (spawned) => {
         if (spawned) {
           playerToken.classList.add('spawned');
         } else {
