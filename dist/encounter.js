@@ -14479,7 +14479,7 @@
       const width = Math.round(img.width / 10);
       const height = Math.round(img.height / 10);
       const bounds = [[0, 0], [height, width]];
-     
+
       leafletSrc.imageOverlay(mapPath, bounds).addTo(map);
       map.fitBounds(bounds);
 
@@ -17331,6 +17331,15 @@
       this.removeIcon = function() {
 
       };
+
+      this.setPlayers = function(players) {
+        storage.setItem('players', JSON.stringify(players));
+      };
+
+      this.getPlayers = function() {
+        const players = JSON.parse(storage.getItem('players'));
+        return players || null;
+      };
     };
 
     // Player icons
@@ -18004,7 +18013,7 @@
       },
       'icon': {
         'tilesize': '60',
-        'mode': 'default'
+        'mode': 'default',
       },
       'data:version': 2,
     };
@@ -18039,7 +18048,7 @@
 
         // Get config or load from local storage
         if (localData.hasMap(options.map) && config.save !== 'false') {
-           options = localData.loadMap(options.map);
+          options = localData.loadMap(options.map);
         }
 
         // Set global state
@@ -18261,7 +18270,13 @@
     });
 
 
-    const defaultPlayers = ['Caster', 'Tank', 'Rogue', 'Healer', 'Wizard'];
+    const defaultPlayers = [
+      {name: 'Caster'},
+      {name: 'Tank'},
+      {name: 'Rogue'},
+      {name: 'Healer'},
+      {name: 'Fighter'},
+    ];
 
     var AddPlayers = Component$1.define({
       playerTarget: null,
@@ -18272,8 +18287,10 @@
         const icons = getRandomPlayerIconList();
         this.playerTarget = this.el.querySelector('div');
 
-        defaultPlayers.forEach((p, idx) => {
-          this.createPlayerRow(p, icons[idx]);
+        const players = localData.getPlayers() || defaultPlayers;
+
+        players.forEach((p, idx) => {
+          this.createPlayerRow({name: p.name, icon: p.icon || icons[idx]});
         });
       },
       events: {
@@ -18282,12 +18299,12 @@
         'click .remove': 'removePlayer',
       },
       addPlayer: function() {
-        this.createPlayerRow();
+        this.createPlayerRow({});
       },
       removePlayer: function(e, target) {
         target.parentNode.remove();
       },
-      createPlayerRow: function(name = '', icon = null) {
+      createPlayerRow: function({name = '', icon = null}) {
         if (!icon) icon = getRandomPlayerIcon();
 
         const nPlayer = playerTpl$1.render(name, icon);
@@ -18299,10 +18316,16 @@
       },
       toUrlString: function() {
         const parts = [];
+        const players = [];
 
         for (const node of this.playerTarget.children) {
-          parts.push(`${node.querySelector('input').value}|${node.querySelector('img').dataset.id}`);
+          const player = {name: node.querySelector('input').value, icon: node.querySelector('img').dataset.id};
+
+          players.push(player);
+          parts.push(`${player.name}|${player.icon}`);
         }
+
+        localData.setPlayers(players);
         return '&players=' + parts.join(',');
       },
       render: async function() {
@@ -18419,7 +18442,7 @@
 
     // Define player defaults
     const defaultPlayers$1 = [
-      {id: 1, name: 'Wizard', icon: null},
+      {id: 1, name: 'Fighter', icon: null},
       {id: 2, name: 'Tank', icon: null},
       {id: 3, name: 'Caster', icon: null},
       {id: 4, name: 'Healer', icon: null},
@@ -18466,7 +18489,7 @@
      */
     function parsePlayerUrl(urlString) {
       // Default players
-      if (!urlString) return defaultPlayers$1;
+      if (!urlString) return localData.getPlayers() || defaultPlayers$1;
 
       // Url provided
       return urlString.split(',').map((p) => {

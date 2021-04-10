@@ -1,5 +1,6 @@
 import Encounter from './Encounter.js';
 import Wizard from './components/Wizard.js';
+import localData from './services/localData.js';
 import {getRandomPlayerIconList} from './utils/getIconImage.js';
 
 // I still don't really get why rollup and similar tools now
@@ -10,7 +11,7 @@ import './app.css';
 
 // Define player defaults
 const defaultPlayers = [
-  {id: 1, name: 'Wizard', icon: null},
+  {id: 1, name: 'Fighter', icon: null},
   {id: 2, name: 'Tank', icon: null},
   {id: 3, name: 'Caster', icon: null},
   {id: 4, name: 'Healer', icon: null},
@@ -57,7 +58,7 @@ export default component;
  */
 function parsePlayerUrl(urlString) {
   // Default players
-  if (!urlString) return defaultPlayers;
+  if (!urlString) return localData.getPlayers() || defaultPlayers;
 
   // Url provided
   return urlString.split(',').map((p) => {
