@@ -1,14 +1,24 @@
-let state;
+let appState, mapState;
 
-const getState = function() {
-	return state;
+const getAppState = function() {
+	return appState;
 }
 
-const setState = function(newState) {
-	state = newState;
+const setAppState = function(newState) {
+	appState = newState;
+}
+
+const getMapState = function() {
+	return mapState;
+}
+
+const setMapState = function(newState) {
+	mapState = newState;
 }
 
 export {
-  getState,
-  setState
+  getAppState,
+ 	setAppState,
+ 	getMapState,
+ 	setMapState
 };

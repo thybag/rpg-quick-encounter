@@ -1,10 +1,8 @@
 const base = {
   // App config
   config: {
-    'container': '#map',
-    'playerBar': '#player-bar',
-    'controlBar': '#control-bar',
-    'assetPath': 'assets/'
+    'assetPath': 'assets/',
+    'dataPrefix': 'qrpg-'
   },
   // Encounter data
   data: {

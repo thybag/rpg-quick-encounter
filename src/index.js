@@ -40,10 +40,10 @@ if (!map) {
       'players': configurePlayers(players),
       'fog': {
         enabled: !(fog && fog == 'false'),
-      },
+      }
     }
   };
-  component = Encounter.make({options, save: saving});
+  component = Encounter.make({el: document.querySelector('body'), options, save: saving});
 }
 
 export default component;

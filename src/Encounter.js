@@ -6,39 +6,52 @@ import Players from './components/PlayerBar.js';
 import Controls from './components/Controls.js';
 
 import localData from './services/localData.js';
+import {setMapState, setAppState, getAppState, getMapState} from './utils/state.js';
 
 import applyDefaults from './utils/applyDefaults.js';
 import {setIconPath} from './utils/getIconImage.js';
 
-import {setState} from './utils/state.js';
-
 export default Component.define({
   initialize: function(config) {
     // Take control of root
-    this.el = document.querySelector('body');
     this.el.classList = 'app';
 
-    console.log(config.options);
     // Apply defaults and sanity check
-    let options = applyDefaults(config.options);
-    console.log(options);
-    if (options.assetPath) {
-      setIconPath(options.assetPath);
-    }
+    let setup = applyDefaults(config.options);
+    setAppState(setup.config);
 
-    // Get config or load from local storage
-    if (localData.hasMap(options.map) && config.save !== 'false') {
-      options.data = localData.loadMap(options.map);
-    }
+    // Set storage key
+    localData.setDataPrefix(setup.config.dataPrefix);
 
-    // Set global state
-    const props = new Model(options);
-    setState(props);
+    // Reload saved map state
+    if (localData.hasMap(setup.data.map) && config.save !== 'false') {
+      setup.data = localData.loadMap(setup.data.map);
+    } 
 
-    const map = EncounterMap.make({});
-    const players = Players.make({});
-    const controls = Controls.make({});
+    // Setup map as reactive model
+    let mapState = new Model(setup.data);
+    setMapState(mapState);
 
+    // Setup DOM structure for Encounter
+    let wrapperEl = document.createElement('div')
+    let mapEl = document.createElement('div');
+    let playerEl = document.createElement('div');
+    let controlEl = document.createElement('div');
+
+    wrapperEl.appendChild(mapEl);
+    wrapperEl.appendChild(playerEl);
+
+    // Add to self
+    this.el.appendChild(wrapperEl);
+    this.el.appendChild(controlEl);
+
+    // Boot Core Components
+    const map = EncounterMap.make({el: mapEl, state: mapState});
+    const players = Players.make({el: playerEl, state: mapState});
+    const controls = Controls.make({el: controlEl, state: mapState});
+
+
+    /* to refactor */
     players.on('map:player:spawn', function(player) {
       map.trigger('map:player:spawn', player);
     });
@@ -51,18 +64,18 @@ export default Component.define({
     controls.on('map:spawn', function(v) {
       const spawn = {
         ...v,
-        id: props.data.spawns.length,
+        id: mapState.data.spawns.length,
         x: 0,
         y: 0,
         spawned: true,
       };
-      props.data.spawns.push(spawn);
-      map.trigger('map:spawn', props.data.spawns[props.data.spawns.length - 1]);
+      mapState.data.spawns.push(spawn);
+      map.trigger('map:spawn', mapState.data.spawns[mapState.data.spawns.length - 1]);
     });
 
     // Save local storage
-    props.on('updated', () => {
-      localData.saveMap(config.options.map, props.data.data);
+    mapState.on('updated', () => {
+      localData.saveMap(mapState.get('map'), mapState.data);
     });
   },
 });

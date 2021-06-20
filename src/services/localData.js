@@ -7,27 +7,41 @@ function uid() {
 export default new function() {
   const storage = window.localStorage;
   const mapPrefix = 'map:';
+  let dataPrefix = '';
+
+  this.setDataPrefix = function(newPrefix) {
+    dataPrefix = newPrefix;
+  }
+  this._get = function(key) {
+    return JSON.parse(storage.getItem(dataPrefix + key));
+  }
+  this._set = function(key, value) {
+    return storage.setItem(dataPrefix + key, JSON.stringify(value));
+  }
+  this._has = function(key) {
+    return (storage.getItem(dataPrefix + key));
+  }
 
   this.hasMap = function(key) {
-    return (storage.getItem(mapPrefix + key));
+    return (this._has(mapPrefix + key));
   };
 
   this.loadMap = function(key) {
-    return JSON.parse(storage.getItem(mapPrefix + key));
+    return this._get(mapPrefix + key);
   };
 
   this.saveMap = function(key, data) {
-    return storage.setItem(mapPrefix + key, JSON.stringify(data));
+    return this._set(mapPrefix + key, data);
   };
 
   this.getMaps = function() {
     return Object.keys(storage).filter((x) => {
-      return x.startsWith('map:');
+      return x.startsWith(dataPrefix + mapPrefix);
     });
   };
 
   this.getIcons = function() {
-    const icons = JSON.parse(storage.getItem('icons'));
+    const icons = this._get('icons');
     return (icons) || {};
   };
 
@@ -39,7 +53,7 @@ export default new function() {
   this.saveIcon = function(iconPath) {
     const icons = this.getIcons();
     icons['icon:' + uid()] = iconPath;
-    storage.setItem('icons', JSON.stringify(icons));
+    this._set('icons', icons);
   };
 
   this.removeIcon = function() {
@@ -47,11 +61,11 @@ export default new function() {
   };
 
   this.setPlayers = function(players) {
-    storage.setItem('players', JSON.stringify(players));
+    this._set('players', players);
   };
 
   this.getPlayers = function() {
-    const players = JSON.parse(storage.getItem('players'));
+    const players = this._get('players');
     return players || null;
   };
 };

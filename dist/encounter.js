@@ -17292,27 +17292,41 @@
     var localData = new function() {
       const storage = window.localStorage;
       const mapPrefix = 'map:';
+      let dataPrefix = '';
+
+      this.setDataPrefix = function(newPrefix) {
+        dataPrefix = newPrefix;
+      };
+      this._get = function(key) {
+        return JSON.parse(storage.getItem(dataPrefix + key));
+      };
+      this._set = function(key, value) {
+        return storage.setItem(dataPrefix + key, JSON.stringify(value));
+      };
+      this._has = function(key) {
+        return (storage.getItem(dataPrefix + key));
+      };
 
       this.hasMap = function(key) {
-        return (storage.getItem(mapPrefix + key));
+        return (this._has(mapPrefix + key));
       };
 
       this.loadMap = function(key) {
-        return JSON.parse(storage.getItem(mapPrefix + key));
+        return this._get(mapPrefix + key);
       };
 
       this.saveMap = function(key, data) {
-        return storage.setItem(mapPrefix + key, JSON.stringify(data));
+        return this._set(mapPrefix + key, data);
       };
 
       this.getMaps = function() {
         return Object.keys(storage).filter((x) => {
-          return x.startsWith('map:');
+          return x.startsWith(dataPrefix + mapPrefix);
         });
       };
 
       this.getIcons = function() {
-        const icons = JSON.parse(storage.getItem('icons'));
+        const icons = this._get('icons');
         return (icons) || {};
       };
 
@@ -17324,7 +17338,7 @@
       this.saveIcon = function(iconPath) {
         const icons = this.getIcons();
         icons['icon:' + uid()] = iconPath;
-        storage.setItem('icons', JSON.stringify(icons));
+        this._set('icons', icons);
       };
 
       this.removeIcon = function() {
@@ -17332,11 +17346,11 @@
       };
 
       this.setPlayers = function(players) {
-        storage.setItem('players', JSON.stringify(players));
+        this._set('players', players);
       };
 
       this.getPlayers = function() {
-        const players = JSON.parse(storage.getItem('players'));
+        const players = this._get('players');
         return players || null;
       };
     };
@@ -17379,11 +17393,6 @@
     const getRandomPlayerIconList = function() {
       // No point using a smarter algo for 8 elements.
       return iconList.sort(() => Math.random() - 0.5);
-    };
-
-    // Change icon path if being used via another app
-    const setIconPath = function(path) {
-      iconPath = path;
     };
 
     // Convert icon to image path
@@ -17494,16 +17503,6 @@
       },
     });
 
-    let state;
-
-    const getState = function() {
-    	return state;
-    };
-
-    const setState = function(newState) {
-    	state = newState;
-    };
-
     const playerToIconMap = {};
     const npcToIconMap = {};
 
@@ -17516,15 +17515,16 @@
     var EncounterMap = Component$1.define({
       map: null,
       fog: null,
-      initialize: function() {
+      initialize: function(config) {
+        // SetID
+        this.el.id = 'map';
 
-        this.options = getState().get('data');
+        this.options = config.state;
 
         // Pass model eventing
-        this.el = document.querySelector(getState().get('config.container'));
         this.render();
 
-        this.listenTo(getState());
+        this.listenTo(config.state);
       },
       events: {
         'map:player:spawn': 'spawnPlayer',
@@ -17551,9 +17551,9 @@
       },
       fogToggled: function(newValue) {
         if (newValue) {
-          this.fog.setLatLngs(JSON.parse(this.options.fog.mask));
+          this.fog.setLatLngs(JSON.parse(this.options.get('fog.mask')));
         } else {
-          this.options.fog.mask = JSON.stringify(this.fog.getLatLngs());
+          this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
           this.fog.setLatLngs(false);
         }
       },
@@ -17561,21 +17561,22 @@
         this.fog.setOpacity(newValue / 100);
       },
       render: async function() {
+        console.log("rend", this.options.get('map'));
         // Grab image from URL
-        this.map = await createMap('map', this.options.map);
+        this.map = await createMap('map', this.options.get('map'));
         this.fog = fogOfWar(this.map);
 
         this.map.on('click', (e) => {
-          if (!this.options.fog.enabled) return;
+          if (!this.options.get('fog.enabled')) return;
 
-          this.fog.clearFog(e.latlng, this.options.fog.clearSize);
-          this.options.fog.mask = JSON.stringify(this.fog.getLatLngs());
+          this.fog.clearFog(e.latlng, this.options.get('fog.clearSize'));
+          this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
         });
         this.map.on('contextmenu', (e) => {
-          if (!this.options.fog.enabled) return;
+          if (!this.options.get('fog.enabled')) return;
 
-          this.fog.addFog(e.latlng, this.options.fog.clearSize);
-          this.options.fog.mask = JSON.stringify(this.fog.getLatLngs());
+          this.fog.addFog(e.latlng, this.options.get('fog.clearSize'));
+          this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
         });
 
         this.reloadData();
@@ -17583,23 +17584,23 @@
       reloadData: function() {
         // Reload save data
         // Load config from settings
-        if (!this.options.fog.mask) {
-          this.options.fog.mask = JSON.stringify(this.fog.getLatLngs());
+        if (!this.options.get('fog.mask')) {
+          this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
         } else {
-          this.fog.initFog(JSON.parse(this.options.fog.mask));
+          this.fog.initFog(JSON.parse(this.options.get('fog.mask')));
         }
 
-        this.fogOpacityChanged(this.options.fog.opacity);
-        this.fogToggled(this.options.fog.enabled);
+        this.fogOpacityChanged(this.options.get('fog.opacity'));
+        this.fogToggled(this.options.get('fog.enabled'));
 
         // Boot players
-        for (const player of Object.values(this.options.players)) {
+        for (const player of Object.values(this.options.get('players'))) {
           if (player.spawned) {
             this.trigger('map:player:spawn', player);
           }
         }
         // Boot spawns
-        for (const spawn of Object.values(this.options.spawns)) {
+        for (const spawn of Object.values(this.options.get('spawns'))) {
           if (spawn.spawned) this.trigger('map:spawn', spawn);
         }
       },
@@ -17644,6 +17645,9 @@
       });
     }
 
+    const setAppState = function(newState) {
+    };
+
     const playerMap = new WeakMap();
 
     const playerTpl = new Template({
@@ -17657,8 +17661,8 @@
 
     var Players = Component$1.define({
       initialize: function(config) {
-        this.options = getState().get('data.players');
-        this.el = document.querySelector(getState().get('config.playerBar'));
+        this.el.id = 'player-bar';
+        this.state = config.state;
         this.render();
       },
       events: {
@@ -17677,7 +17681,7 @@
         this.trigger('map:player:focus', player);
       },
       render: async function() {
-        this.options.map((player, index) => {
+        this.state.get('players').map((player, index) => {
           const playerToken = playerTpl.render(player.name, player.icon);
           playerMap.set(playerToken, player);
 
@@ -17686,12 +17690,12 @@
           if (player.spawned) playerToken.classList.add('spawned');
 
           // Listen for name changes
-          getState().on(`update:data.players.${index}.name`, (newName) => {
+          this.state.on(`update:data.players.${index}.name`, (newName) => {
             playerToken.querySelector('span').innerText = newName;
             playerToken.setAttribute('title', newName);
           });
 
-          getState().on(`update:data.players.${index}.spawned`, (spawned) => {
+           this.state.on(`update:data.players.${index}.spawned`, (spawned) => {
             if (spawned) {
               playerToken.classList.add('spawned');
             } else {
@@ -18005,11 +18009,25 @@
       },
     });
 
+    const controlsTpl = new Template({
+      template: () => {
+        return `
+        <a href="https://github.com/thybag/rpg-quick-encounter" target="_blank">Help</a>
+        <span class='fog'>Fog</span>
+        <span class="spawn">Spawn</span>
+    `;
+      },
+    });
+
     var Controls = Component$1.define({
       initialize: function(config) {
+        // SetID
+        this.el.id = 'control-bar';
 
-        this.el = document.querySelector(getState().get('config.controlBar'));
-        this.fogControls = FogControls.make({fogProps: getState().get('data.fog')});
+        // Render controls
+        this.el.appendChild(controlsTpl.render());
+
+        this.fogControls = FogControls.make({fogProps: config.state.get('fog')});
         this.spawnControls = SpawnControls.make();
         this.render();
 
@@ -18037,10 +18055,8 @@
     const base = {
       // App config
       config: {
-        'container': '#map',
-        'playerBar': '#player-bar',
-        'controlBar': '#control-bar',
-        'assetPath': 'assets/'
+        'assetPath': 'assets/',
+        'dataPrefix': 'qrpg-'
       },
       // Encounter data
       data: {
@@ -18079,30 +18095,43 @@
     var Encounter = Component$1.define({
       initialize: function(config) {
         // Take control of root
-        this.el = document.querySelector('body');
         this.el.classList = 'app';
 
-        console.log(config.options);
         // Apply defaults and sanity check
-        let options = applyDefaults(config.options);
-        console.log(options);
-        if (options.assetPath) {
-          setIconPath(options.assetPath);
-        }
+        let setup = applyDefaults(config.options);
+        setAppState(setup.config);
 
-        // Get config or load from local storage
-        if (localData.hasMap(options.map) && config.save !== 'false') {
-          options.data = localData.loadMap(options.map);
-        }
+        // Set storage key
+        localData.setDataPrefix(setup.config.dataPrefix);
 
-        // Set global state
-        const props = new Model(options);
-        setState(props);
+        // Reload saved map state
+        if (localData.hasMap(setup.data.map) && config.save !== 'false') {
+          setup.data = localData.loadMap(setup.data.map);
+        } 
 
-        const map = EncounterMap.make({});
-        const players = Players.make({});
-        const controls = Controls.make({});
+        // Setup map as reactive model
+        let mapState = new Model(setup.data);
 
+        // Setup DOM structure for Encounter
+        let wrapperEl = document.createElement('div');
+        let mapEl = document.createElement('div');
+        let playerEl = document.createElement('div');
+        let controlEl = document.createElement('div');
+
+        wrapperEl.appendChild(mapEl);
+        wrapperEl.appendChild(playerEl);
+
+        // Add to self
+        this.el.appendChild(wrapperEl);
+        this.el.appendChild(controlEl);
+
+        // Boot Core Components
+        const map = EncounterMap.make({el: mapEl, state: mapState});
+        const players = Players.make({el: playerEl, state: mapState});
+        const controls = Controls.make({el: controlEl, state: mapState});
+
+
+        /* to refactor */
         players.on('map:player:spawn', function(player) {
           map.trigger('map:player:spawn', player);
         });
@@ -18115,18 +18144,18 @@
         controls.on('map:spawn', function(v) {
           const spawn = {
             ...v,
-            id: props.data.spawns.length,
+            id: mapState.data.spawns.length,
             x: 0,
             y: 0,
             spawned: true,
           };
-          props.data.spawns.push(spawn);
-          map.trigger('map:spawn', props.data.spawns[props.data.spawns.length - 1]);
+          mapState.data.spawns.push(spawn);
+          map.trigger('map:spawn', mapState.data.spawns[mapState.data.spawns.length - 1]);
         });
 
         // Save local storage
-        props.on('updated', () => {
-          localData.saveMap(config.options.map, props.data.data);
+        mapState.on('updated', () => {
+          localData.saveMap(mapState.get('map'), mapState.data);
         });
       },
     });
@@ -18515,10 +18544,10 @@
           'players': configurePlayers(players),
           'fog': {
             enabled: !(fog$1 && fog$1 == 'false'),
-          },
+          }
         }
       };
-      component = Encounter.make({options, save: saving});
+      component = Encounter.make({el: document.querySelector('body'), options, save: saving});
     }
 
     var component$1 = component;
