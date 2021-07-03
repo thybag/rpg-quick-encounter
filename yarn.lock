@@ -2187,9 +2187,9 @@ lru-cache@^6.0.0:
   dependencies:
     yallist "^4.0.0"
 
-"lumpjs@git+ssh://git@github.com/thybag/lump.js.git":
+"lumpjs@https://github.com/thybag/lump.js.git":
   version "0.0.1"
-  resolved "git+ssh://git@github.com/thybag/lump.js.git#96308841c4403243387dff6e9f8c08212f92077c"
+  resolved "https://github.com/thybag/lump.js.git#859bf43fe3911b008ed53f085456c26a3f28b7ac"
 
 magic-string@^0.25.7:
   version "0.25.7"
