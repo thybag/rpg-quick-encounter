@@ -87,8 +87,8 @@ export default Component.define({
     },
     // Render changes
     render: function() {
-    // Reload save data
-    // Load config from settings
+        // Reload save data
+        // Load config from settings
         if (!this.options.get('fog.mask')) {
             this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
         } else {

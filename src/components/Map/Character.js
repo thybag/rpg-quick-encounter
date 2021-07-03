@@ -50,6 +50,8 @@ export default Component.define({
 
         this.ref.on('update:name', (e) => this.trigger('data:change', e));
         this.ref.on('update:icon', (e) => this.trigger('data:change', e));
+        this.ref.on('update:x', (e) => this.trigger('data:change', e));
+        this.ref.on('update:y', (e) => this.trigger('data:change', e));
 
         // Make icon
         this.render();
@@ -85,6 +87,13 @@ export default Component.define({
         }
     },
     render: function() {
+        this.ref = this.ref.refresh();
+        // Sync spawned?
+        // remove / add to map?
+
+        // Sync position
+        this.marker.setLatLng([this.ref.x, this.ref.y]);
+        // Sync icon
         this.marker.setIcon(
             L.divIcon({
                 className: 'character-icon',

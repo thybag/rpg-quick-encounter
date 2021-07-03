@@ -295,6 +295,10 @@
                                 return parent.on(listener, callback);
                             };
                         }
+                        if (prop == 'refresh') {
+                            return () => parent.get(context);
+                        }
+
                     }
 
                     // Normal functionalty - ie. actuallt getting values
@@ -555,18 +559,18 @@
 
         // Fire change type events
         switch (returnType) {
-        case 'CREATE':
-            this.trigger('create:'+namespace, updated);
-            break;
-        case 'UPDATE':
-            this.trigger('update:'+namespace, updated, original);
-            break;
-        case 'REMOVE':
-            this.trigger('remove:'+namespace, original);
-            break;
-        case 'NONE':
-            this.trigger('unchanged:'+namespace, original);
-            break;
+            case 'CREATE':
+                this.trigger('create:'+namespace, updated);
+                break;
+            case 'UPDATE':
+                this.trigger('update:'+namespace, updated, original);
+                break;
+            case 'REMOVE':
+                this.trigger('remove:'+namespace, original);
+                break;
+            case 'NONE':
+                this.trigger('unchanged:'+namespace, original);
+                break;
         }
 
         // Fire general change events, both namspaced and global.
@@ -17473,7 +17477,6 @@
     });
 
     leafletSrc.fog = function(bounds, options) {
-        console.log(bounds);
         return new leafletSrc.Fog(bounds, options);
     };
 
@@ -17880,11 +17883,10 @@
             'click .spawn-modal': 'close',
             'click img': 'openPickList',
             'click input[type=submit]': 'save',
-            'keyup input[type=text]': 'detectSubmit'
+            'keyup input[type=text]': 'detectSubmit',
         },
         // Save via keyboard
         detectSubmit: function(e) {
-
             if (e.key == 'Enter' || e.keyCode == 13) {
                 this.save();
             }
@@ -17911,7 +17913,6 @@
     /**
      * Make Leaflet Marker
      *
-     * @param  {[type]} iconMarkup [description]
      * @param  {[type]} position  [description]
      * @return {[type]}      [description]
      */
@@ -17934,7 +17935,7 @@
             'marker:dblclick': 'characterDblClick',
             'marker:dragend': 'characterDragend',
             'marker:contextmenu': 'characterRemove',
-            'data:change': 'render'
+            'data:change': 'render',
         },
         initialize: function({ref, map}) {
             // Store key vals
@@ -17942,7 +17943,7 @@
             this.map = map;
 
             this.marker = makeMarker(
-                (ref.x) ? leafletSrc.latLng(ref.x, ref.y) : map.getCenter()
+                (ref.x) ? leafletSrc.latLng(ref.x, ref.y) : map.getCenter(),
             );
             // Add to map
             this.marker.addTo(this.map);
@@ -17955,6 +17956,8 @@
 
             this.ref.on('update:name', (e) => this.trigger('data:change', e));
             this.ref.on('update:icon', (e) => this.trigger('data:change', e));
+            this.ref.on('update:x', (e) => this.trigger('data:change', e));
+            this.ref.on('update:y', (e) => this.trigger('data:change', e));
 
             // Make icon
             this.render();
@@ -17990,13 +17993,20 @@
             }
         },
         render: function() {
+            this.ref = this.ref.refresh();
+            // Sync spawned?
+            // remove / add to map?
+
+            // Sync position
+            this.marker.setLatLng([this.ref.x, this.ref.y]);
+            // Sync icon
             this.marker.setIcon(
                 leafletSrc.divIcon({
                     className: 'character-icon',
                     html: this.tpl(this.ref.name, this.ref.icon),
                     iconSize: [60, 80],
                     iconAnchor: [35, 35],
-                })
+                }),
             );
         },
     });
@@ -18085,8 +18095,8 @@
         },
         // Render changes
         render: function() {
-        // Reload save data
-        // Load config from settings
+            // Reload save data
+            // Load config from settings
             if (!this.options.get('fog.mask')) {
                 this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
             } else {
@@ -18572,11 +18582,27 @@
                 map.trigger('map:spawn', mapState.data.spawns[mapState.data.spawns.length - 1]);
             });
 
+            // Test code to see if we can sync data between maps
+            window.addEventListener('storage', (change) => {
+                if (change.key == 'map:'+setup.data.map) {
+                    const newData = JSON.parse(change.newValue);
+                    mapState.set('spawns', newData.spawns);
+                    mapState.set('fog', newData.fog);
+                    mapState.set('players', newData.players);
+
+                    console.log("Sync changes");
+                }
+            });
+            
+            // Debugging
+            mapState.on('change', function(a,b,c,d){
+                if(a != 'NONE') console.log("CHANGE",a,b,c,d);
+            });
+
             // Save local storage
             mapState.on('updated', debounce(
                 () => {
                     // Avoid unneeded saves
-                    //
                     localData.saveMap(mapState.get('map'), mapState.data);
                     console.log(JSON.parse(JSON.stringify(mapState.data)));
                 }, 50),

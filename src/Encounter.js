@@ -75,11 +75,27 @@ export default Component.define({
             map.trigger('map:spawn', mapState.data.spawns[mapState.data.spawns.length - 1]);
         });
 
+        // Test code to see if we can sync data between maps
+        window.addEventListener('storage', (change) => {
+            if (change.key == 'map:'+setup.data.map) {
+                const newData = JSON.parse(change.newValue);
+                mapState.set('spawns', newData.spawns);
+                mapState.set('fog', newData.fog);
+                mapState.set('players', newData.players);
+
+                console.log('Sync changes');
+            }
+        });
+
+        // Debugging
+        mapState.on('change', function(a, b, c, d) {
+            if (a != 'NONE') console.log('CHANGE', a, b, c, d);
+        });
+
         // Save local storage
         mapState.on('updated', debounce(
             () => {
                 // Avoid unneeded saves
-                //
                 localData.saveMap(mapState.get('map'), mapState.data);
                 console.log(JSON.parse(JSON.stringify(mapState.data)));
             }, 50),
