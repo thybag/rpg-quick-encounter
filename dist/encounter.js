@@ -19,22 +19,22 @@
         'contextmenu',
         'focusin', // focus
         'focusout', // blur?
-        'change'
+        'change',
     ];
-    // Blur/focus cannot be defered, so use 
+    // Blur/focus cannot be defered, so use
     // override events instead on listeners
     const eventOverride = {
         'focus': 'focusin',
-        'blur': 'focusout'
+        'blur': 'focusout',
     };
 
     const Component = function() {
         // Component
-        let ComponentImplementation = function(config) {
-            // Copy methods to Object
+        const ComponentImplementation = function(config) {
+        // Copy methods to Object
             if (config) {
                 Object.keys(config).forEach(function(key) {
-                    if(key != 'events') this[key] = config[key];
+                    if (key != 'events') this[key] = config[key];
                 }, this);
             }
 
@@ -43,21 +43,22 @@
                 this.el = document.createElement('div');
             }
 
-            this.initialize.apply(this, arguments);
-            this.connect.apply(this, [config.events]);
+            /* eslint-disable prefer-rest-params */
+            this.initialize(...arguments);
+            this.connect(config.events);
         };
 
         ComponentImplementation.prototype.trigger = function(event, ...args) {
-            for (let i of this._events[event] || []) {
+            for (const i of this._events[event] || []) {
                 // Trigger event (either func or method to call)
                 i[1](...args);
             }
         };
         ComponentImplementation.prototype.on = function(key, method) {
-            // Add a listener
-            let split = key.indexOf(' ');
-            let event = (split===-1) ? key : key.substr(0,split);
-            let target = (split===-1) ? '' : key.substr(split+1);
+        // Add a listener
+            const split = key.indexOf(' ');
+            let event = (split===-1) ? key : key.substr(0, split);
+            const target = (split===-1) ? '' : key.substr(split+1);
 
             // Override event type if needed.
             if (eventOverride[event]) {
@@ -65,10 +66,10 @@
             }
 
             // Wrap runner in to method
-            let run = (...args) => {
-                if (typeof method === "function") {
+            const run = (...args) => {
+                if (typeof method === 'function') {
                     method(...args);
-                }else {
+                } else {
                     this[method](...args);
                 }
             };
@@ -87,7 +88,7 @@
             }
 
             // Else handle as deligated
-            let handler = (e) => {
+            const handler = (e) => {
                 // e.target was the clicked element
                 if (e.target && e.target.matches(target)) {
                     // If function? run it
@@ -100,30 +101,30 @@
             return this;
         };
         ComponentImplementation.prototype.off = function(key) {
-            // Remove a listener
-            for (let [event, handler] of this._events[key] || []) {
-                 this.el.removeEventListener(event, handler);
+        // Remove a listener
+            for (const [event, handler] of this._events[key] || []) {
+                this.el.removeEventListener(event, handler);
             }
             delete this._events[key];
         };
         ComponentImplementation.prototype.connect = function(events) {
-            // Create events on new obj, so components don't share
+        // Create events on new obj, so components don't share
             this._events = [];
             if (!events || typeof events !== 'object') return;
             // connected all events
-            for (let [key, method] of Object.entries(events)) {
+            for (const [key, method] of Object.entries(events)) {
                 this.on(key, method);
             }
         };
         ComponentImplementation.prototype.disconnect = function() {
-            // Remove all events
-            for (let [key, method] of Object.entries(this._events)) {
+        // Remove all events
+            for (const [key] of Object.entries(this._events)) {
                 this.off(key);
             }
         };
         ComponentImplementation.prototype.listenTo = function(model) {
-            if (typeof model.addListener !== 'function'){
-                throw 'Model does not support listeners';
+            if (typeof model.addListener !== 'function') {
+                throw new Error('Model does not support listeners');
             }
             model.addListener(this);
         };
@@ -140,9 +141,8 @@
         };
 
         // Define base component
-        this.define = function(config)
-        {
-            let definedComponent = new Component;
+        this.define = function(config) {
+            const definedComponent = new Component;
             definedComponent.config = config;
             return definedComponent;
         };
@@ -153,35 +153,78 @@
     /**
      * Basic model to watch data. Will fire events on changed parts of data tree.
      *
+     * @param {object} _data - Initial data for model to hold.
      */
     const Model = function(_data) {
-        let parent = this;
+        const parent = this;
         // Cache data access/edit
-        let _cache = new WeakMap();
-        let _original = JSON.parse(JSON.stringify(_data));
+        const _cache = new WeakMap();
+        const _original = JSON.parse(JSON.stringify(_data));
 
         // Eventing
         this._events = {};
         this._listeners = [];
 
-        // Dete
-        this.applyChanges = function(ctx)
-        {
-            // Detect changes to data
-            let change = this.detectChanges(ctx.split('.'), _original, _data);
-            // Update internal data to match
+        // toggle to bypass magic methods
+        this._ignoreMagicMethods = false;
+
+        // Apply detected changes.
+        this.applyChanges = function(ctx) {
+        // Detect changes to data, fireing events as needed.
+            const change = this.detectChanges(ctx.split('.'), _original, _data);
+            // Update internal data cache to match
             if (change !== 'NONE') {
                 this.commitChanges(ctx.split('.'), _original, _data);
                 this.trigger('updated');
-            } 
+            }
         };
 
-        // Create watcher proxy
+        /**
+         * Create watcher proxy to manage each object in model
+         * Provides access to get,set,on helpers + wraps access in proxies
+         * in order to allow for dynamic change detection
+         *
+         * @param  {object} result  data to wrap in proxy
+         * @param  {string} context datapath to current object
+         * @return {Proxy}          Object wrapped in Proxy
+         */
         function newProxy(result, context) {
-            const proxyTraps =  {
-                get: function(obj, prop, receiver)
-                {
-                    let ctx = context ? context + '.' + prop : prop;
+            const proxyTraps = {
+                get: function(obj, prop, receiver) {
+                    const ctx = context ? context + '.' + prop : prop;
+
+                    // Magic methods are temproarly disabled as part of gets using the
+                    // `get` method, so as to allow datapoints using protected names
+                    // such as get,set,on etc to be accessed directly if needed.
+                    if (!parent._ignoreMagicMethods) {
+                        // Magic methods, as standard these names cannot be used for datapoints
+                        // usless via the get/set methods themselves
+                        if (prop == 'get') {
+                            return function(key) {
+                                return parent.get(`${context}.${key}`);
+                            };
+                        }
+                        if (prop == 'set') {
+                            return function(key, value) {
+                                return parent.set(`${context}.${key}`, value);
+                            };
+                        }
+                        if (prop == 'on') {
+                            return function(event, callback) {
+                                let listener = `${event}:${context}`;
+                                // Event may either be purely the event type (change,update)
+                                // or type + sub key change:subAttr. In case of sub attr
+                                // we want to insert context between the event and the path
+                                if (event.includes(':')) {
+                                    const parts = event.split(':');
+                                    listener = `${parts[0]}:${context}.${parts[1]}`;
+                                }
+                                return parent.on(listener, callback);
+                            };
+                        }
+                    }
+
+                    // Normal functionalty - ie. actuallt getting values
                     let result = Reflect.get(obj, prop);
 
                     if (parent.isObject(result)) {
@@ -189,17 +232,19 @@
                     }
 
                     // Trigger read event
-                    parent.trigger("read", ctx);
+                    parent.trigger('read', ctx);
                     return result;
                 },
                 set: function(obj, prop, value) {
-                    let success = Reflect.set(obj, prop, value);
-                    let ctx = context ? context + '.' + prop : prop;
+                    // Change value & grab context
+                    const success = Reflect.set(obj, prop, value);
+                    const ctx = context ? context + '.' + prop : prop;
+
                     // Detect changes and fire relevent events
                     parent.applyChanges(ctx);
 
                     return success;
-                }
+                },
             };
             // Config proxy or get from cache
             const resultProxy = _cache.get(result) || new Proxy(result, proxyTraps);
@@ -212,51 +257,110 @@
 
     const jsPathRegex = /([^[.\]])+/g;
 
-    // get attribute
-    Model.prototype.get = function(key, fallback = undefined)
-    {
+    /**
+     * Get value from model
+     *
+     * @param  {string} key      Object path using dot or array notation.
+     * @param  {[type]} fallback [description]
+     * @return {[type]}          [description]
+     */
+    Model.prototype.get = function(key, fallback = undefined) {
         if (!key) return fallback;
 
         const keyArray = Array.isArray(key) ? key : key.match(jsPathRegex);
 
-        return (
+        // Toggle magic methods off to allow get to access `get`,`on` if needed.
+        this._ignoreMagicMethods = true;
+        const result = (
             keyArray.reduce((prevObj, key) => prevObj && prevObj[key], this.data) || fallback
         );
-    };
-    // Set attribute
-    Model.prototype.set = function(key, value)
-    {
-        const keyArray = Array.isArray(key) ? key : key.match(jsPathRegex);
+        this._ignoreMagicMethods = false;
 
-        keyArray.reduce((acc, prop, i) => {
-            if (acc[prop] === undefined) acc[prop] = {};
-            if (i === keyArray.length - 1) acc[prop] = value;
-            return acc[prop];
-        }, this.data);
+        return result;
     };
-    // Trigger event
+
+    /**
+     * Set value on model
+     * @param {string} key      Object path using dot or array notation.
+     * @param {[type]} value [description]
+     */
+    Model.prototype.set = function(key, value) {
+        // Get key path
+        const keyArray = Array.isArray(key) ? key : key.match(jsPathRegex);
+        // Setup vars
+        let base = this.data;
+        let insert; let insertLocation;
+
+        // Iterate object
+        for (let i = 0; i < keyArray.length; i++ ) {
+            if (i === keyArray.length - 1) {
+                base[keyArray[i]] = value;
+            } else {
+                // If we need to create new objects as we walk the path, we need to
+                // do this in a new object rather than updating the existing tree directly.
+                // This is so that we avoid fireing duplicate update events after each nested
+                // object is added, and instead attach the object all in one go.
+                if (base[keyArray[i]] === undefined) {
+                    // If we start building a new tree, track where we need to reinsert
+                    if (!insertLocation) {
+                        insertLocation = [base, keyArray[i]];
+                        insert = base = {};
+                    }
+                    base[keyArray[i]] = {};
+                }
+
+                // Get next level
+                base = base[keyArray[i]];
+            }
+        }
+
+        // If we've build an external object, inject it into the model again
+        if (insertLocation) {
+            const [location, key] = insertLocation;
+            location[key] = insert[key];
+        }
+    };
+
+    /**
+     * Trigger event on model
+     *
+     * @param  {[type]}    event [description]
+     * @param  {...[type]} args  [description]
+     */
     Model.prototype.trigger = function(event, ...args) {
         // Fire own event
-        for (let i of this._events[event] || []) {
-            // Trigger event (either func or method to call)
-            if (typeof i[1] === "function") {
+        for (const i of this._events[event] || []) {
+        // Trigger event (either func or method to call)
+            if (typeof i[1] === 'function') {
                 i[1](...args);
-            }else {
+            } else {
                 this[i[1]](...args);
             }
         }
 
         // Fire listeners
-        for(let listener of this._listeners) {
+        for (const listener of this._listeners) {
             listener.trigger(event, ...args);
         }
     };
-    // Add event
+
+    /**
+     * Listen for event on model
+     * @param  {string} key    Object path using dot or array notation.
+     * @param  {[type]} method [description]
+     * @return {[type]}        [description]
+     */
     Model.prototype.on = function(key, method) {
         (this._events[key] = this._events[key] || []).push([key, method]);
         return this;
     };
-    // Remove event
+
+    /**
+     * Remove event listener
+     * @param  {string} key    Object path using dot or array notation.
+     * @param  {[type]} method [description]
+     * @return {[type]}        [description]
+     */
     Model.prototype.off = function(key, method) {
         if (!this._events[key]) return this;
 
@@ -266,25 +370,34 @@
             return this;
         }
         // Else only one with method
-        for (let evt in this._events[key]) {
-            if(this._events[key][evt][1] == method) {
+        for (const evt in this._events[key]) {
+            if (this._events[key][evt][1] == method) {
                 this._events[key].splice(evt, 1);
             }
         }
 
         return this;
     };
-    // Add listener
-    Model.prototype.addListener = function (listener) {
-        if (typeof listener.trigger !== 'function'){
-            throw 'Unsupported listener type provided. Must implement trigger method.'
+
+    /**
+     * Register self as an external listener for model events
+     * @param {[type]} listener [description]
+     * @return {object} model
+     */
+    Model.prototype.addListener = function(listener) {
+        if (typeof listener.trigger !== 'function') {
+            throw new Error('Unsupported listener type provided. Must implement trigger method.');
         }
         this._listeners.push(listener);
         return this;
     };
-    // Remove listener
-    Model.prototype.removeListener = function (listener) {
-        let idx = this._listeners.indexOf(listener);
+    /**
+     * Remove self as an external listener for model events
+     * @param {[type]} listener [description]
+     * @return {object} model
+     */
+    Model.prototype.removeListener = function(listener) {
+        const idx = this._listeners.indexOf(listener);
         if (idx !== -1) {
             this._listeners.splice(this._listeners.indexOf(listener), 1);
         }
@@ -292,34 +405,32 @@
     };
 
     // Util to clone object
-    Model.prototype.copy = function(data)
-    {
+    Model.prototype.copy = function(data) {
         return (typeof data == 'object') ? JSON.parse(JSON.stringify(data)) : data;
     };
 
     // Detect change type for a primative
-    Model.prototype.detectChangeType = function(original, updated)
-    {
-        if(typeof original === 'undefined') return "CREATE"; // additional key added to our new data
-        if(typeof updated === 'undefined') return "REMOVE"; // old key removed from our new data
-        if(original==updated) return "NONE"; // data unchanged between the two keys
+    Model.prototype.detectChangeType = function(original, updated) {
+        if (typeof updated === 'undefined' && typeof original === 'undefined') return 'REMOVE'; // complete detach
+        if (typeof original === 'undefined') return 'CREATE'; // additional key added to our new data
+        if (typeof updated === 'undefined') return 'REMOVE'; // old key removed from our new data
+        if (original==updated) return 'NONE'; // data unchanged between the two keys
 
-        return "UPDATE"; // A mix - so an update
+        return 'UPDATE'; // A mix - so an update
     };
 
     // Detect objects that are not NULL values
-    Model.prototype.isObject = function (value)
-    {
-       return (typeof value === 'object' && value !== null);
+    Model.prototype.isObject = function(value) {
+        return (typeof value === 'object' && value !== null);
     };
 
     // Detect changes in watched data
-    Model.prototype.detectChanges = function (keys, original, updated, namespace = '')
-    {
+    Model.prototype.detectChanges = function(keys, original, updated, namespace = '') {
         // Detect any changes in the affected data path
-        // (keys is an array start from root the the affected location)
-        let next = keys.shift();
+        // (keys is an array starting from the root of the affected location)
+        const next = keys.shift();
         let returnType = 'UPDATE';
+
         namespace = namespace ? `${namespace}.${next}` : next;
 
         // Get values we're comparing
@@ -327,26 +438,40 @@
         updated = updated ? updated[next] : undefined;
 
         // Target key not yet reached, dig on to the next key
-        if (keys.length != 0) returnType = this.detectChanges(this.copy(keys), original, updated, namespace);
+        if (keys.length != 0) {
+            returnType = this.detectChanges(this.copy(keys), original, updated, namespace);
+            // If real change was a create or remove, this parent has been updated, so swap type
+            if (returnType == 'CREATE' || returnType == 'REMOVE') returnType = 'UPDATE';
+        }
 
         // Target depth reached.
         if (keys.length == 0) {
-            // Detect attribute changes to children
-            if (this.isObject(updated) ||this.isObject(original)) {
+        // Detect attribute changes to children
+        // ie. if you remove an object, its children need to fire remove events
+            if (this.isObject(updated) || this.isObject(original)) {
                 // Check for field changes
-                let fields = new Set([
-                    ...(updated) ? Object.keys(updated) : [],
-                    ...(original) ? Object.keys(original) : []
+                const fields = new Set([
+                    ...(this.isObject(updated)) ? Object.keys(updated) : [],
+                    ...(this.isObject(original)) ? Object.keys(original) : [],
                 ]);
 
-                let results = [];
-                for (let key of fields) {
+                const results = [];
+                for (const key of fields) {
                     results.push(this.detectChanges([key], original, updated, namespace));
                 }
+
                 // Object checks
-                if(!original && original !== false) returnType = 'CREATE';
-                if(!updated && updated !== false) returnType = 'REMOVE';
-                if (results.every(function(val){ return val == 'NONE'})) {
+                // If both old/new don't exist, these values were detached/removed
+                // If only original doesn't, then we're creating
+                // If only new doesn't, we're removing
+                if (typeof updated === 'undefined' && typeof original === 'undefined') returnType = 'REMOVE';
+                if (typeof original === 'undefined') returnType = 'CREATE';
+                if (typeof updated === 'undefined') returnType = 'REMOVE';
+
+                // If all the sub objects were unchanged, the ob was unchanged.
+                if (results.length !== 0 && results.every(function(val) {
+                    return val == 'NONE';
+                })) {
                     returnType = 'NONE';
                 }
             } else {
@@ -357,31 +482,32 @@
 
         // Fire change type events
         switch (returnType) {
-            case 'CREATE':
-                this.trigger("create:"+namespace, updated);
-                break;
-            case 'UPDATE':
-                this.trigger("update:"+namespace, updated, original);
-                break;
-            case 'REMOVE':
-                this.trigger("remove:"+namespace, original);
-                break;
-            case 'NONE':
-                this.trigger("unchanged:"+namespace);
-                break;
+        case 'CREATE':
+            this.trigger('create:'+namespace, updated);
+            break;
+        case 'UPDATE':
+            this.trigger('update:'+namespace, updated, original);
+            break;
+        case 'REMOVE':
+            this.trigger('remove:'+namespace, original);
+            break;
+        case 'NONE':
+            this.trigger('unchanged:'+namespace, original);
+            break;
         }
 
-        // Fire general change events
-        this.trigger("change:"+namespace, returnType, updated, original);
-        this.trigger("change", returnType, namespace, updated, original);
+        // Fire general change events, both namspaced and global.
+        this.trigger('change:'+namespace, returnType, updated, original);
+        this.trigger('change', returnType, namespace, updated, original);
 
         return returnType;
     };
+
     // Apply change to original, so new changes can be detected
-    Model.prototype.commitChanges = function(keys, original, updated){
-        let next = keys.shift();
+    Model.prototype.commitChanges = function(keys, original, updated) {
+        const next = keys.shift();
         // Insert either at most accurate point, or where original deoes not yet exist
-        if (keys.length == 0  || !original[next]) {
+        if (keys.length == 0 || !original[next]) {
             original[next] = this.copy(updated[next]);
             return;
         }
@@ -17019,7 +17145,7 @@
 
     var operation = new Operation();
 
-    var union = function union(geom) {
+    var union$1 = function union(geom) {
       for (var _len = arguments.length, moreGeoms = new Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
         moreGeoms[_key - 1] = arguments[_key];
       }
@@ -17043,7 +17169,7 @@
       return operation.run('xor', geom, moreGeoms);
     };
 
-    var difference = function difference(subjectGeom) {
+    var difference$1 = function difference(subjectGeom) {
       for (var _len4 = arguments.length, clippingGeoms = new Array(_len4 > 1 ? _len4 - 1 : 0), _key4 = 1; _key4 < _len4; _key4++) {
         clippingGeoms[_key4 - 1] = arguments[_key4];
       }
@@ -17052,10 +17178,10 @@
     };
 
     var index = {
-      union: union,
+      union: union$1,
       intersection: intersection$1,
       xor: xor,
-      difference: difference
+      difference: difference$1
     };
 
     /**
@@ -17092,7 +17218,7 @@
      * //addToMap
      * var addToMap = [polygon1, polygon2, difference];
      */
-    function difference$1(polygon1, polygon2) {
+    function difference(polygon1, polygon2) {
       var geom1 = getGeom(polygon1);
       var geom2 = getGeom(polygon2);
       var properties = polygon1.properties || {};
@@ -17114,7 +17240,7 @@
      * @param {Feature<Polygon|MultiPolygon>} polygon2 Polygon feature to difference from polygon1
      * @param {Object} [options={}] Optional Parameters
      * @param {Object} [options.properties={}] Translate Properties to output Feature
-     * @returns {Feature<(Polygon|MultiPolygon)>} a combined {@link Polygon} or {@link MultiPolygon} feature
+     * @returns {Feature<(Polygon|MultiPolygon)>} a combined {@link Polygon} or {@link MultiPolygon} feature, or null if the inputs are empty
      * @example
      * var poly1 = turf.polygon([[
      *     [-82.574787, 35.594087],
@@ -17136,7 +17262,7 @@
      * //addToMap
      * var addToMap = [poly1, poly2, union];
      */
-    function union$1(poly1, poly2, options) {
+    function union(poly1, poly2, options) {
         if (options === void 0) { options = {}; }
         var geom1 = getGeom(poly1);
         var geom2 = getGeom(poly2);
@@ -17158,7 +17284,7 @@
     }
 
     // Keep track of cut out sections
-    var fog = new function() {
+    var fog$1 = new function() {
       this.cutouts = null;
 
       this.loadCutOuts = function(multipolys) {
@@ -17181,7 +17307,7 @@
         }
         const cutoutPoly = multiPolygon(this.cutouts);
         const newPoly = polygon([poly]);
-        const u = union$1(cutoutPoly, newPoly);
+        const u = union(cutoutPoly, newPoly);
 
         this.cutouts = u.geometry.coordinates;
 
@@ -17192,7 +17318,7 @@
         const cutoutPoly = multiPolygon(this.cutouts);
         const newPoly = polygon([poly]);
 
-        const u = difference$1(cutoutPoly, newPoly);
+        const u = difference(cutoutPoly, newPoly);
 
         // Handle null if no difference found (ie. we cleared it all)
         if (!u) {
@@ -17215,19 +17341,19 @@
       },
       initFog: function(mask) {
         // Load mask back to fog format & apply it from reload
-        const newFog = fog.loadCutOuts(mask);
+        const newFog = fog$1.loadCutOuts(mask);
         this.applyFog(newFog);
       },
       clearFog: function(latLng, size = 36) {
         // Get area Poly
         const areaPoly = circleToPolygon([latLng.lat, latLng.lng], size);
-        const cutouts = fog.addCutOut(areaPoly);
+        const cutouts = fog$1.addCutOut(areaPoly);
 
         return this.applyFog(cutouts);
       },
       addFog: function(latLng, size = 36) {
         const areaPoly = circleToPolygon([latLng.lat, latLng.lng], size);
-        const cutouts = fog.removeCutOut(areaPoly);
+        const cutouts = fog$1.removeCutOut(areaPoly);
 
         return this.applyFog(cutouts);
       },
@@ -17297,12 +17423,15 @@
       this.setDataPrefix = function(newPrefix) {
         dataPrefix = newPrefix;
       };
+      // Get helper to reteave a value from store
       this._get = function(key) {
         return JSON.parse(storage.getItem(dataPrefix + key));
       };
+      // Set helper, to save a value to store
       this._set = function(key, value) {
         return storage.setItem(dataPrefix + key, JSON.stringify(value));
       };
+      // Exists helper to check if value exists in store.
       this._has = function(key) {
         return (storage.getItem(dataPrefix + key));
       };
@@ -17319,22 +17448,31 @@
         return this._set(mapPrefix + key, data);
       };
 
+      // Get all map paths in dataPrefix
       this.getMaps = function() {
+        let len = (dataPrefix + mapPrefix).length;
+        // Find matching maps, the strip of prefix based on
+        // length of len
         return Object.keys(storage).filter((x) => {
           return x.startsWith(dataPrefix + mapPrefix);
+        }).map((x) => {
+          return x.substr(len);
         });
       };
 
+      // Get all icons
       this.getIcons = function() {
         const icons = this._get('icons');
         return (icons) || {};
       };
 
+      // get a single icon
       this.getIcon = function(id) {
         const icons = this.getIcons();
         return icons[id];
       };
 
+      // Save a new icon
       this.saveIcon = function(iconPath) {
         const icons = this.getIcons();
         icons['icon:' + uid()] = iconPath;
@@ -17360,14 +17498,14 @@
     const monsterIcons = 33;
     let iconPath = 'assets/';
 
-    const iconList = []; const monsterList = [];
+    const iconList$2 = []; const monsterList = [];
 
-    for (let i = 1; i <= playerIcons; i++) iconList.push('p:' + i);
+    for (let i = 1; i <= playerIcons; i++) iconList$2.push('p:' + i);
     for (let i = 1; i <= monsterIcons; i++) monsterList.push('m:' + i);
 
     // Get all player icons
     const getPlayerIcons = function() {
-      return iconList;
+      return iconList$2;
     };
     // Get all monster icons
     const getMonsterIcons = function() {
@@ -17381,7 +17519,7 @@
 
     // Get random player icon
     const getRandomPlayerIcon = function() {
-      return iconList[Math.floor((Math.random() * iconList.length))];
+      return iconList$2[Math.floor((Math.random() * iconList$2.length))];
     };
 
     // Get random monster icon
@@ -17392,7 +17530,7 @@
     // Get player icons as unique list
     const getRandomPlayerIconList = function() {
       // No point using a smarter algo for 8 elements.
-      return iconList.sort(() => Math.random() - 0.5);
+      return iconList$2.sort(() => Math.random() - 0.5);
     };
 
     // Convert icon to image path
@@ -17515,24 +17653,37 @@
     var EncounterMap = Component$1.define({
       map: null,
       fog: null,
-      initialize: function(config) {
+      // Setup
+      initialize: async function(config) {
         // SetID
         this.el.id = 'map';
-
         this.options = config.state;
+
+        // Setup map itself
+        this.map = await createMap('map', this.options.get('map'));
+        this.fog = fogOfWar(this.map);
+
+        // Register leaflet Listeners
+        this.map.on('click', (e) => this.trigger('map:click', e));
+        this.map.on('contextmenu', (e) => this.trigger('map:contextmenu', e));
+
+        // Listen to model
+        this.listenTo(config.state);
 
         // Pass model eventing
         this.render();
-
-        this.listenTo(config.state);
       },
+      // Events
       events: {
+        'map:click': 'fogClear',
+        'map:contextmenu': 'fogAdd',
         'map:player:spawn': 'spawnPlayer',
         'map:player:focus': 'focusPlayer',
         'map:spawn': 'spawnNpc',
         'update:fog.enabled': 'fogToggled',
-        'update:fog.opacity': 'fogOpacityChanged',
+        'update:fog.opacity': 'fogOpacityChanged'
       },
+      // Map actions
       spawnPlayer: function(player) {
         const marker = this.generateMarker(player.name, player.icon, player);
         playerToIconMap[player.id] = marker;
@@ -17560,28 +17711,20 @@
       fogOpacityChanged: function(newValue) {
         this.fog.setOpacity(newValue / 100);
       },
-      render: async function() {
-        console.log("rend", this.options.get('map'));
-        // Grab image from URL
-        this.map = await createMap('map', this.options.get('map'));
-        this.fog = fogOfWar(this.map);
-
-        this.map.on('click', (e) => {
+      fogClear: function(e){
           if (!this.options.get('fog.enabled')) return;
 
           this.fog.clearFog(e.latlng, this.options.get('fog.clearSize'));
           this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
-        });
-        this.map.on('contextmenu', (e) => {
+      },
+      fogAdd: function(e){
           if (!this.options.get('fog.enabled')) return;
 
           this.fog.addFog(e.latlng, this.options.get('fog.clearSize'));
           this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
-        });
-
-        this.reloadData();
       },
-      reloadData: function() {
+      // Render changes
+      render: function() {
         // Reload save data
         // Load config from settings
         if (!this.options.get('fog.mask')) {
@@ -17645,12 +17788,9 @@
       });
     }
 
-    const setAppState = function(newState) {
-    };
-
     const playerMap = new WeakMap();
 
-    const playerTpl = new Template({
+    const playerCardTpl = new Template({
       template: (name, icon) => {
         return `
         <img src="${getIconImage(icon)}">
@@ -17682,35 +17822,36 @@
       },
       render: async function() {
         this.state.get('players').map((player, index) => {
-          const playerToken = playerTpl.render(player.name, player.icon);
-          playerMap.set(playerToken, player);
+          const playerCard = playerCardTpl.render(player.name, player.icon);
+          playerMap.set(playerCard, player);
 
-          playerToken.setAttribute('title', player.name);
+          playerCard.setAttribute('title', player.name);
 
-          if (player.spawned) playerToken.classList.add('spawned');
+          if (player.spawned) playerCard.classList.add('spawned');
+
+          this.el.appendChild(playerCard);
 
           // Listen for name changes
-          this.state.on(`update:data.players.${index}.name`, (newName) => {
-            playerToken.querySelector('span').innerText = newName;
-            playerToken.setAttribute('title', newName);
+          player.on(`update:name`, (newName) => {
+            playerCard.querySelector('span').innerText = newName;
+            playerCard.setAttribute('title', newName);
           });
-
-           this.state.on(`update:data.players.${index}.spawned`, (spawned) => {
+          // Listen for spawn changes
+          player.on(`update:spawned`, (spawned) => {
             if (spawned) {
-              playerToken.classList.add('spawned');
+              playerCard.classList.add('spawned');
             } else {
-              playerToken.classList.remove('spawned');
+              playerCard.classList.remove('spawned');
             }
           });
-
-          this.el.appendChild(playerToken);
         });
 
+        // Make list sortable
         dragSort(this.el.children);
       },
     });
 
-    const controlTpl = function(fogProps) {
+    const controlTpl$3 = function(fogProps) {
       const tpl = `
         <label>
             <span>Fog opacity</span>
@@ -17735,7 +17876,7 @@
 
     var FogControls = Component$1.define({
       initialize: function(options) {
-        this.el = controlTpl(this.fogProps);
+        this.el = controlTpl$3(this.fogProps);
         this.el.className = 'fog-controls';
         this.el.style.display = 'none';
         document.body.appendChild(this.el);
@@ -17778,7 +17919,7 @@
       },
     });
 
-    const controlTpl$1 = new Template({
+    const controlTpl$2 = new Template({
       template: () => {
         return `
       <main></main>
@@ -17788,388 +17929,6 @@
     });
 
     const iconList$1 = new Template({
-      template: () => {
-        let NPCList = ''; let MonsterList = ''; let CustomList = '';
-
-        getPlayerIcons().forEach((i) => {
-          NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-        });
-        getMonsterIcons().forEach((i) => {
-          MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-        });
-        getCustomIcons().forEach((i) => {
-          CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-        });
-
-        return `
-      <div>Your images</div>
-          <span>+</span>  ${CustomList}
-      <div>NPCs/Players</div>
-          ${NPCList}
-      <div>Monsters</div>
-          ${MonsterList}
-      `;
-      },
-    });
-
-    /**
-     * load filedata from upload
-     *
-     * @param  {[type]} iconImg [description]
-     * @return {[type]}         [description]
-     */
-    async function loadFile(iconImg) {
-      const imgData = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(iconImg);
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror = reject;
-      });
-
-      return checkImage(imgData);
-    }
-
-    /**
-     * resize and return as final icon image to store
-     *
-     * @param  {[type]} iconImg [description]
-     * @return {[type]}         [description]
-     */
-    async function imageToIcon(iconImg) {
-      const img = await loadFile(iconImg);
-
-      // Local storage is small so we wanna scale it down before we save
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-
-      // draw source image into the off-screen canvas:
-      canvas.width = 70;
-      canvas.height = 70;
-      ctx.drawImage(img, 0, 0, 70, 70);
-
-      return canvas.toDataURL('image/webp', 0.8);
-    }
-
-    var ImagePicker = Component$1.define({
-      initialize: function(options) {
-        this.el = controlTpl$1.render();
-        this.el.className = 'image-picker';
-        this.el.style.display = 'none';
-        document.body.appendChild(this.el);
-      },
-      parent: null,
-      prop: {
-        visible: false,
-      },
-      events: {
-        'click img': 'select',
-        'click button': 'close',
-        'click span': 'addIcon',
-
-        'dragover main': 'uploadEnable',
-        'drop main': 'upload',
-        'dragenter main': 'uploadFocus',
-        'dragleave main': 'uploadBlur',
-      },
-      uploadEnable: function(e) {
-        // Need this to be able to upload.
-        e.preventDefault();
-      },
-      open: function(parent) {
-        this.prop.visible = true;
-        this.parent = parent;
-        this.render();
-      },
-      select: function(e, item) {
-        this.parent.src = item.src;
-        this.parent.dataset.id = (item.dataset.id) ? item.dataset.id : item.src;
-
-        this.close();
-      },
-      close: function() {
-        this.parent = null;
-        this.prop.visible = false;
-        this.render();
-      },
-      uploadFocus: function(e) {
-        e.preventDefault();
-        this.el.classList.add('uploadHover');
-      },
-      uploadBlur: function(e) {
-        e.preventDefault();
-        this.el.classList.remove('uploadHover');
-      },
-      upload: async function(e) {
-        e.preventDefault();
-
-        const files = e.dataTransfer.files;
-
-        // Get files that were dragged
-        for (let f = 0; f < files.length; f++) {
-          const file = files[f];
-          // Only deal with images
-          if (!file.type.match('image.*')) continue;
-
-          const newIcon = await imageToIcon(file);
-          localData.saveIcon(newIcon);
-        }
-        this.render();
-        this.uploadBlur(e);
-      },
-      addIcon: async function() {
-        const iconPath = prompt('Icon image url');
-        if (iconPath) {
-          try {
-            await checkImage(iconPath);
-            localData.saveIcon(iconPath);
-            this.render();
-          } catch (e) {
-            alert('failed to load image');
-          }
-        }
-      },
-      render: async function() {
-        this.el.querySelector('main').innerHTML = iconList$1.render().innerHTML;
-
-        if (this.prop.visible) {
-          this.el.style.display = 'block';
-        } else {
-          this.el.style.display = 'none';
-        }
-      },
-    });
-
-    const controlTpl$2 = new Template({
-      template: () => {
-        const defaultIcon = getRandomMonsterIcon();
-        return `
-      <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
-      <div>
-          <label>Name</label>
-          <input type="text" value="Unknown">
-          <input type='submit' value="Spawn">
-      </div>
-    `;
-      },
-    });
-
-    var SpawnControls = Component$1.define({
-      initialize: function(options) {
-        this.el = controlTpl$2.render();
-        this.el.className = 'spawn-controls';
-        this.el.style.display = 'none';
-        document.body.appendChild(this.el);
-
-        this.picker = null;
-      },
-      prop: {
-        visible: false,
-        mode: 'spawn',
-        target: null
-      },
-      events: {
-        'click img': 'openPickList',
-        'click input[type=submit]': 'save',
-      },
-      openPickList: function(e, target) {
-        if (!this.picker) this.picker = ImagePicker.make();
-        this.picker.open(target);
-      },
-      save: function(e, target) {
-        // default
-        if (this.prop.mode == 'spawn') {
-          this.trigger('map:spawn', {name: this.el.querySelector('input[type=text]').value, icon: this.el.querySelector('img').dataset.id});
-        } 
-        if (this.prop.mode == 'edit') ;    
-      },
-      toggle: function() {
-        this.prop.visible ? this.hide() : this.show();
-      },
-      show: function(mode = 'spawn') {
-        this.prop.visible = true;
-        this.prop.mode = mode;
-        this.render();
-      },
-      hide: function() {
-        this.prop.visible = false;
-        this.render();
-      },
-      render: async function() {
-        if (this.prop.visible) {
-          this.el.style.display = 'block';
-        } else {
-          this.el.style.display = 'none';
-        }
-
-        if (this.prop.mode == 'spawn') {
-          this.el.querySelector('submit').value = 'Spawn';
-        } else {
-          this.el.querySelector('submit').value = 'Save';
-        }
-      },
-    });
-
-    const controlsTpl = new Template({
-      template: () => {
-        return `
-        <a href="https://github.com/thybag/rpg-quick-encounter" target="_blank">Help</a>
-        <span class='fog'>Fog</span>
-        <span class="spawn">Spawn</span>
-    `;
-      },
-    });
-
-    var Controls = Component$1.define({
-      initialize: function(config) {
-        // SetID
-        this.el.id = 'control-bar';
-
-        // Render controls
-        this.el.appendChild(controlsTpl.render());
-
-        this.fogControls = FogControls.make({fogProps: config.state.get('fog')});
-        this.spawnControls = SpawnControls.make();
-        this.render();
-
-        // Pass it up
-        this.spawnControls.on('map:spawn', (v) => {
-          this.trigger('map:spawn', v);
-        });
-
-      },
-      events: {
-        'click span.fog': 'fogToggle',
-        'click span.spawn': 'spawnToggle',
-      },
-      fogToggle: function(e, target) {
-        this.fogControls.toggle();
-      },
-      spawnToggle: function(e, target) {
-        this.spawnControls.toggle();
-      },
-      render: async function() {
-
-      },
-    });
-
-    const base = {
-      // App config
-      config: {
-        'assetPath': 'assets/',
-        'dataPrefix': 'qrpg-'
-      },
-      // Encounter data
-      data: {
-        'map': null,
-        'players': [],
-        'spawns': [],
-        'fog': {
-          enabled: true,
-          opacity: 70,
-          clearSize: 36,
-          mask: '',
-        },
-        'icon': {
-          'tilesize': '60',
-          'mode': 'default',
-        },
-        'data:version': 3,
-      }
-    };
-
-    function applySettings(base, overrides) {
-      for (const [key, value] of Object.entries(overrides)) {
-        if (typeof value === 'object' && value !== null) {
-          base[key] = applySettings(base[key] ?? {}, value);
-        } else {
-          base[key] = value;
-        }
-      }
-      return base;
-    }
-
-    function applyDefaults(options) {
-      return applySettings(base, options);
-    }
-
-    var Encounter = Component$1.define({
-      initialize: function(config) {
-        // Take control of root
-        this.el.classList = 'app';
-
-        // Apply defaults and sanity check
-        let setup = applyDefaults(config.options);
-        setAppState(setup.config);
-
-        // Set storage key
-        localData.setDataPrefix(setup.config.dataPrefix);
-
-        // Reload saved map state
-        if (localData.hasMap(setup.data.map) && config.save !== 'false') {
-          setup.data = localData.loadMap(setup.data.map);
-        } 
-
-        // Setup map as reactive model
-        let mapState = new Model(setup.data);
-
-        // Setup DOM structure for Encounter
-        let wrapperEl = document.createElement('div');
-        let mapEl = document.createElement('div');
-        let playerEl = document.createElement('div');
-        let controlEl = document.createElement('div');
-
-        wrapperEl.appendChild(mapEl);
-        wrapperEl.appendChild(playerEl);
-
-        // Add to self
-        this.el.appendChild(wrapperEl);
-        this.el.appendChild(controlEl);
-
-        // Boot Core Components
-        const map = EncounterMap.make({el: mapEl, state: mapState});
-        const players = Players.make({el: playerEl, state: mapState});
-        const controls = Controls.make({el: controlEl, state: mapState});
-
-
-        /* to refactor */
-        players.on('map:player:spawn', function(player) {
-          map.trigger('map:player:spawn', player);
-        });
-        players.on('map:player:focus', function(player) {
-          map.trigger('map:player:focus', player);
-        });
-
-        map.on('aaa');
-
-        controls.on('map:spawn', function(v) {
-          const spawn = {
-            ...v,
-            id: mapState.data.spawns.length,
-            x: 0,
-            y: 0,
-            spawned: true,
-          };
-          mapState.data.spawns.push(spawn);
-          map.trigger('map:spawn', mapState.data.spawns[mapState.data.spawns.length - 1]);
-        });
-
-        // Save local storage
-        mapState.on('updated', () => {
-          localData.saveMap(mapState.get('map'), mapState.data);
-        });
-      },
-    });
-
-    const controlTpl$3 = new Template({
-      template: () => {
-        return `
-      <main></main>
-      <footer><button>Cancel</button></footer>
-    `;
-      },
-    });
-
-    const iconList$2 = new Template({
       template: () => {
         let NPCList = ''; let MonsterList = ''; let CustomList = '';
 
@@ -18234,7 +17993,7 @@
 
     var ImagePicker$1 = Component$1.define({
       initialize: function(options) {
-        this.el = controlTpl$3.render();
+        this.el = controlTpl$2.render();
         this.el.className = 'image-picker';
         this.el.style.display = 'none';
         document.body.appendChild(this.el);
@@ -18311,7 +18070,390 @@
         }
       },
       render: async function() {
-        this.el.querySelector('main').innerHTML = iconList$2.render().innerHTML;
+        this.el.querySelector('main').innerHTML = iconList$1.render().innerHTML;
+
+        if (this.prop.visible) {
+          this.el.style.display = 'block';
+        } else {
+          this.el.style.display = 'none';
+        }
+      },
+    });
+
+    const controlTpl$1 = new Template({
+      template: () => {
+        const defaultIcon = getRandomMonsterIcon();
+        return `
+      <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
+      <div>
+          <label>Name</label>
+          <input type="text" value="Unknown">
+          <input type='submit' value="Spawn">
+      </div>
+    `;
+      },
+    });
+
+    var SpawnControls = Component$1.define({
+      initialize: function(options) {
+        this.el = controlTpl$1.render();
+        this.el.className = 'spawn-controls';
+        this.el.style.display = 'none';
+        document.body.appendChild(this.el);
+
+        this.picker = null;
+      },
+      prop: {
+        visible: false,
+        mode: 'spawn',
+        target: null
+      },
+      events: {
+        'click img': 'openPickList',
+        'click input[type=submit]': 'save',
+      },
+      openPickList: function(e, target) {
+        if (!this.picker) this.picker = ImagePicker$1.make();
+        this.picker.open(target);
+      },
+      save: function(e, target) {
+        // default
+        if (this.prop.mode == 'spawn') {
+          this.trigger('map:spawn', {name: this.el.querySelector('input[type=text]').value, icon: this.el.querySelector('img').dataset.id});
+        } 
+        if (this.prop.mode == 'edit') ;    
+      },
+      toggle: function() {
+        this.prop.visible ? this.hide() : this.show();
+      },
+      show: function(mode = 'spawn') {
+        this.prop.visible = true;
+        this.prop.mode = mode;
+        this.render();
+      },
+      hide: function() {
+        this.prop.visible = false;
+        this.render();
+      },
+      render: async function() {
+        if (this.prop.visible) {
+          this.el.style.display = 'block';
+        } else {
+          this.el.style.display = 'none';
+        }
+
+        if (this.prop.mode == 'spawn') {
+          this.el.querySelector('[type=submit]').value = 'Spawn';
+        } else {
+          this.el.querySelector('[type=submit]').value = 'Save';
+        }
+      },
+    });
+
+    const controlsTpl = new Template({
+      template: () => {
+        return `
+        <a href="https://github.com/thybag/rpg-quick-encounter" target="_blank">Help</a>
+        <span class='fog'>Fog</span>
+        <span class="spawn">Spawn</span>
+    `;
+      },
+    });
+
+    var Controls = Component$1.define({
+      initialize: function(config) {
+        // SetID
+        this.el.id = 'control-bar';
+
+        // Render controls
+        this.el.appendChild(controlsTpl.render());
+
+        this.fogControls = FogControls.make({fogProps: config.state.get('fog')});
+        this.spawnControls = SpawnControls.make();
+        this.render();
+
+        // Pass it up
+        this.spawnControls.on('map:spawn', (v) => {
+          this.trigger('map:spawn', v);
+        });
+
+      },
+      events: {
+        'click span.fog': 'fogToggle',
+        'click span.spawn': 'spawnToggle',
+      },
+      fogToggle: function(e, target) {
+        this.fogControls.toggle();
+      },
+      spawnToggle: function(e, target) {
+        this.spawnControls.toggle();
+      },
+      render: async function() {
+
+      },
+    });
+
+    const setAppState = function(newState) {
+    };
+
+    const base = {
+      // App config
+      config: {
+        'assetPath': 'assets/',
+        'dataPrefix': 'qrpg-'
+      },
+      // Encounter data
+      data: {
+        'map': null,
+        'players': [],
+        'spawns': [],
+        'fog': {
+          enabled: true,
+          opacity: 70,
+          clearSize: 36,
+          mask: '',
+        },
+        'icon': {
+          'tilesize': '60',
+          'mode': 'default',
+        },
+        'data:version': 3,
+      }
+    };
+
+    function applySettings(base, overrides) {
+      for (const [key, value] of Object.entries(overrides)) {
+        if (typeof value === 'object' && value !== null) {
+          base[key] = applySettings(base[key] ?? {}, value);
+        } else {
+          base[key] = value;
+        }
+      }
+      return base;
+    }
+
+    function applyDefaults(options = {}) {
+      return applySettings(base, options);
+    }
+
+    var Encounter = Component$1.define({
+      initialize: function(config) {
+        // Take control of root
+        this.el.classList = 'app';
+
+        // Apply defaults and sanity check
+        let setup = applyDefaults(config.options);
+        setAppState(setup.config);
+        console.log(setup.config.dataPrefix);
+        // Set storage key
+        localData.setDataPrefix(setup.config.dataPrefix);
+
+        // Reload saved map state
+        if (localData.hasMap(setup.data.map) && config.save !== 'false') {
+          setup.data = localData.loadMap(setup.data.map);
+        } 
+
+        // Setup map as reactive model
+        let mapState = new Model(setup.data);
+
+        // Setup DOM structure for Encounter maps
+        let wrapperEl = document.createElement('div');
+        let mapEl = document.createElement('div');
+        let playerEl = document.createElement('div');
+        let controlEl = document.createElement('div');
+
+        wrapperEl.appendChild(mapEl);
+        wrapperEl.appendChild(playerEl);
+
+        // Add to self
+        this.el.appendChild(wrapperEl);
+        this.el.appendChild(controlEl);
+
+        // Boot Core Components
+        const map = EncounterMap.make({el: mapEl, state: mapState});
+        const players = Players.make({el: playerEl, state: mapState});
+        const controls = Controls.make({el: controlEl, state: mapState});
+
+        /* to refactor */
+        players.on('map:player:spawn', function(player) {
+          map.trigger('map:player:spawn', player);
+        });
+        players.on('map:player:focus', function(player) {
+          map.trigger('map:player:focus', player);
+        });
+
+        controls.on('map:spawn', function(v) {
+          const spawn = {
+            ...v,
+            id: mapState.data.spawns.length,
+            x: 0,
+            y: 0,
+            spawned: true,
+          };
+          mapState.data.spawns.push(spawn);
+          map.trigger('map:spawn', mapState.data.spawns[mapState.data.spawns.length - 1]);
+        });
+
+        // Save local storage
+        mapState.on('updated', () => {
+          console.log(JSON.stringify(mapState.data));
+          localData.saveMap(mapState.get('map'), mapState.data);
+        });
+      },
+    });
+
+    const controlTpl = new Template({
+      template: () => {
+        return `
+      <main></main>
+      <footer><button>Cancel</button></footer>
+    `;
+      },
+    });
+
+    const iconList = new Template({
+      template: () => {
+        let NPCList = ''; let MonsterList = ''; let CustomList = '';
+
+        getPlayerIcons().forEach((i) => {
+          NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+        });
+        getMonsterIcons().forEach((i) => {
+          MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+        });
+        getCustomIcons().forEach((i) => {
+          CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+        });
+
+        return `
+      <div>Your images</div>
+          <span>+</span>  ${CustomList}
+      <div>NPCs/Players</div>
+          ${NPCList}
+      <div>Monsters</div>
+          ${MonsterList}
+      `;
+      },
+    });
+
+    /**
+     * load filedata from upload
+     *
+     * @param  {[type]} iconImg [description]
+     * @return {[type]}         [description]
+     */
+    async function loadFile(iconImg) {
+      const imgData = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(iconImg);
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+      });
+
+      return checkImage(imgData);
+    }
+
+    /**
+     * resize and return as final icon image to store
+     *
+     * @param  {[type]} iconImg [description]
+     * @return {[type]}         [description]
+     */
+    async function imageToIcon(iconImg) {
+      const img = await loadFile(iconImg);
+
+      // Local storage is small so we wanna scale it down before we save
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      // draw source image into the off-screen canvas:
+      canvas.width = 70;
+      canvas.height = 70;
+      ctx.drawImage(img, 0, 0, 70, 70);
+
+      return canvas.toDataURL('image/webp', 0.8);
+    }
+
+    var ImagePicker = Component$1.define({
+      initialize: function(options) {
+        this.el = controlTpl.render();
+        this.el.className = 'image-picker';
+        this.el.style.display = 'none';
+        document.body.appendChild(this.el);
+      },
+      parent: null,
+      prop: {
+        visible: false,
+      },
+      events: {
+        'click img': 'select',
+        'click button': 'close',
+        'click span': 'addIcon',
+
+        'dragover main': 'uploadEnable',
+        'drop main': 'upload',
+        'dragenter main': 'uploadFocus',
+        'dragleave main': 'uploadBlur',
+      },
+      uploadEnable: function(e) {
+        // Need this to be able to upload.
+        e.preventDefault();
+      },
+      open: function(parent) {
+        this.prop.visible = true;
+        this.parent = parent;
+        this.render();
+      },
+      select: function(e, item) {
+        this.parent.src = item.src;
+        this.parent.dataset.id = (item.dataset.id) ? item.dataset.id : item.src;
+
+        this.close();
+      },
+      close: function() {
+        this.parent = null;
+        this.prop.visible = false;
+        this.render();
+      },
+      uploadFocus: function(e) {
+        e.preventDefault();
+        this.el.classList.add('uploadHover');
+      },
+      uploadBlur: function(e) {
+        e.preventDefault();
+        this.el.classList.remove('uploadHover');
+      },
+      upload: async function(e) {
+        e.preventDefault();
+
+        const files = e.dataTransfer.files;
+
+        // Get files that were dragged
+        for (let f = 0; f < files.length; f++) {
+          const file = files[f];
+          // Only deal with images
+          if (!file.type.match('image.*')) continue;
+
+          const newIcon = await imageToIcon(file);
+          localData.saveIcon(newIcon);
+        }
+        this.render();
+        this.uploadBlur(e);
+      },
+      addIcon: async function() {
+        const iconPath = prompt('Icon image url');
+        if (iconPath) {
+          try {
+            await checkImage(iconPath);
+            localData.saveIcon(iconPath);
+            this.render();
+          } catch (e) {
+            alert('failed to load image');
+          }
+        }
+      },
+      render: async function() {
+        this.el.querySelector('main').innerHTML = iconList.render().innerHTML;
 
         if (this.prop.visible) {
           this.el.style.display = 'block';
@@ -18331,7 +18473,7 @@
       },
     });
 
-    const playerTpl$1 = new Template({
+    const playerTpl = new Template({
       template: (name, icon) => {
         return `
         <span class="icon"><img src="${getIconImage(icon)}" data-id="${icon}"></span>
@@ -18343,7 +18485,7 @@
     });
 
 
-    const defaultPlayers = [
+    const defaultPlayers$1 = [
       {name: 'Caster'},
       {name: 'Tank'},
       {name: 'Rogue'},
@@ -18360,7 +18502,7 @@
         const icons = getRandomPlayerIconList();
         this.playerTarget = this.el.querySelector('div');
 
-        const players = localData.getPlayers() || defaultPlayers;
+        const players = localData.getPlayers() || defaultPlayers$1;
 
         players.forEach((p, idx) => {
           this.createPlayerRow({name: p.name, icon: p.icon || icons[idx]});
@@ -18380,11 +18522,11 @@
       createPlayerRow: function({name = '', icon = null}) {
         if (!icon) icon = getRandomPlayerIcon();
 
-        const nPlayer = playerTpl$1.render(name, icon);
+        const nPlayer = playerTpl.render(name, icon);
         this.playerTarget.appendChild(nPlayer);
       },
       openPickList: function(e, target) {
-        if (!this.picker) this.picker = ImagePicker$1.make();
+        if (!this.picker) this.picker = ImagePicker.make();
         this.picker.open(target);
       },
       toUrlString: function() {
@@ -18439,9 +18581,8 @@
         return `
       <h2>Your existing saves</h2>
       <main>
-          ${saves.map((s) => {
-    const map = s.substr(4);// Remove prefix
-    return `<a href="?map=${map}"><img src="${map}"/></a>`;
+          ${saves.map((map) => {
+    return `<a href="?map=${map}"><img src="${map}" loading="lazy" /></a>`;
   }).join('')}
       </main>
     `;
@@ -18451,6 +18592,12 @@
 
     var Wizard = Component$1.define({
       initialize: function(config) {
+
+        // Setup default envs
+        let setup = applyDefaults();
+        localData.setDataPrefix(setup.config.dataPrefix);
+
+
         this.el = wizardTpl.render();
         document.body.appendChild(this.el);
         this.render();
@@ -18514,7 +18661,7 @@
     });
 
     // Define player defaults
-    const defaultPlayers$1 = [
+    const defaultPlayers = [
       {id: 1, name: 'Fighter', icon: null},
       {id: 2, name: 'Tank', icon: null},
       {id: 3, name: 'Caster', icon: null},
@@ -18526,7 +18673,7 @@
     const url = new URLSearchParams(window.location.search);
     const map = url.get('map');
     const players = parsePlayerUrl(url.get('players'));
-    const fog$1 = url.get('fog');
+    const fog = url.get('fog');
 
     // Disable reload from local storage
     const saving = url.has('saving') ? url.get('saving') : 'true';
@@ -18543,7 +18690,7 @@
           // Setup default images if none provided
           'players': configurePlayers(players),
           'fog': {
-            enabled: !(fog$1 && fog$1 == 'false'),
+            enabled: !(fog && fog == 'false'),
           }
         }
       };
@@ -18564,7 +18711,7 @@
      */
     function parsePlayerUrl(urlString) {
       // Default players
-      if (!urlString) return localData.getPlayers() || defaultPlayers$1;
+      if (!urlString) return localData.getPlayers() || defaultPlayers;
 
       // Url provided
       return urlString.split(',').map((p) => {

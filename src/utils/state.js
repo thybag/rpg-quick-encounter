@@ -1,24 +1,24 @@
-let appState, mapState;
+let appState; let mapState;
 
 const getAppState = function() {
-	return appState;
-}
+    return appState;
+};
 
 const setAppState = function(newState) {
-	appState = newState;
-}
+    appState = newState;
+};
 
 const getMapState = function() {
-	return mapState;
-}
+    return mapState;
+};
 
 const setMapState = function(newState) {
-	mapState = newState;
-}
+    mapState = newState;
+};
 
 export {
-  getAppState,
+    getAppState,
  	setAppState,
  	getMapState,
- 	setMapState
+ 	setMapState,
 };

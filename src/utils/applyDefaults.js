@@ -1,39 +1,39 @@
 const base = {
-  // App config
-  config: {
-    'assetPath': 'assets/',
-    'dataPrefix': 'qrpg-'
-  },
-  // Encounter data
-  data: {
-    'map': null,
-    'players': [],
-    'spawns': [],
-    'fog': {
-      enabled: true,
-      opacity: 70,
-      clearSize: 36,
-      mask: '',
+    // App config
+    config: {
+        'assetPath': 'assets/',
+        'dataPrefix': 'qrpg-',
     },
-    'icon': {
-      'tilesize': '60',
-      'mode': 'default',
+    // Encounter data
+    data: {
+        'map': null,
+        'players': [],
+        'spawns': [],
+        'fog': {
+            enabled: true,
+            opacity: 70,
+            clearSize: 36,
+            mask: '',
+        },
+        'icon': {
+            'tilesize': '60',
+            'mode': 'default',
+        },
+        'data:version': 3,
     },
-    'data:version': 3,
-  }
 };
 
 function applySettings(base, overrides) {
-  for (const [key, value] of Object.entries(overrides)) {
-    if (typeof value === 'object' && value !== null) {
-      base[key] = applySettings(base[key] ?? {}, value);
-    } else {
-      base[key] = value;
+    for (const [key, value] of Object.entries(overrides)) {
+        if (typeof value === 'object' && value !== null) {
+            base[key] = applySettings(base[key] ?? {}, value);
+        } else {
+            base[key] = value;
+        }
     }
-  }
-  return base;
+    return base;
 }
 
-export default function(options) {
-  return applySettings(base, options);
+export default function(options = {}) {
+    return applySettings(base, options);
 }

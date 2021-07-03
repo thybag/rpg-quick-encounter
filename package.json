@@ -9,8 +9,9 @@
   "lumpjs": "git+ssh://git@github.com/thybag/lump.js.git"
  },
  "scripts": {
-  "build": "rollup -c",
+  "start": "rollup -c --watch",
   "watch": "rollup -c --watch",
+  "build": "rollup -c",
   "lint": "eslint src --fix"
  },
  "devDependencies": {
