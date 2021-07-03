@@ -22,12 +22,12 @@ export default new function() {
     this.cutouts = null;
 
     this.loadCutOuts = function(multipolys) {
-    // Load cutouts from restore.
-    //
-    // This data is the drawn multipoly of the leaflet mask
-    // so we need to strip off the outer mask (as we don't deal with
-    // that here) and the convert the poly or multipolys from leaflet
-    // latLngs to [lat,lng] pairs.
+        // Load cutouts from restore.
+        //
+        // This data is the drawn multipoly of the leaflet mask
+        // so we need to strip off the outer mask (as we don't deal with
+        // that here) and the convert the poly or multipolys from leaflet
+        // latLngs to [lat,lng] pairs.
         multipolys.shift();
         this.cutouts = mployToPairs(multipolys);
 

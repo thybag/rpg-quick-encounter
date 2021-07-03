@@ -51,6 +51,10 @@ export default Component.define({
                 playerCard.querySelector('span').innerText = newName;
                 playerCard.setAttribute('title', newName);
             });
+            player.on(`update:icon`, (newIcon) => {
+                playerCard.querySelector('img').src = getIconImage(newIcon);
+            });
+
             // Listen for spawn changes
             player.on(`update:spawned`, (spawned) => {
                 if (spawned) {

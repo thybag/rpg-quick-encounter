@@ -198,7 +198,7 @@ input[type='submit']:hover {
 /* image picker */
 .image-picker {
   position: absolute;
-  z-index: 1200;
+  z-index: 1205;
   top: calc(50vh - 380px);
   background: #ffff;
   width: 50vw;
@@ -474,4 +474,35 @@ input[type='submit']:hover {
     z-index: 1;
     text-align: center;
     color:#fff;
+}
+
+
+.spawn-modal {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1200;
+    background-color: rgba(0,0,0,0.8);
+    cursor: pointer;
+}
+.spawn-modal > div {
+    bottom: auto;
+    top: 1rem;
+    right: calc(50% - (500px / 2));
+}
+
+.spawn-modal .spawn-controls h2 {
+    background:#24c37e;
+    padding: .5rem;
+    color: #fff;
+    margin: 0;
+}
+.spawn-modal .spawn-controls input[type=text] {
+    width: 280px;
+}
+.spawn-modal .spawn-controls input[type=submit] {
+    padding: .5rem .8rem;
+    border: solid 2px #24c37e;
 }

@@ -2,35 +2,18 @@ import L from 'leaflet';
 import Component from 'lumpjs/src/component.js';
 import getIconImage from '../../utils/getIconImage.js';
 
-/**
- * Make Icon
- *
- * @param  {[type]} markup [description]
- * @return {[type]}      [description]
- */
-function makeIcon(markup) {
-    return L.divIcon({
-        className: 'character-icon',
-        html: markup,
-        iconSize: [60, 80],
-        iconAnchor: [35, 35],
-    });
-}
+import SpawnModal from '../Controls/SpawnModal.js';
 
 /**
  * Make Leaflet Marker
  *
- * @param  {[type]} ref  [description]
- * @param  {[type]} icon [description]
- * @param  {[type]} map  [description]
+ * @param  {[type]} position  [description]
  * @return {[type]}      [description]
  */
-function makeMarker(ref, icon, map) {
-    const position = (ref.x) ? L.latLng(ref.x, ref.y) : map.getCenter();
+function makeMarker(position) {
     return L.marker(
         position,
         {
-            icon: icon,
             draggable: true,
         },
     );
@@ -38,7 +21,6 @@ function makeMarker(ref, icon, map) {
 
 export default Component.define({
     marker: null,
-    icon: null,
     ref: null,
     map: null,
     // Events
@@ -47,19 +29,29 @@ export default Component.define({
         'marker:dblclick': 'characterDblClick',
         'marker:dragend': 'characterDragend',
         'marker:contextmenu': 'characterRemove',
+        'data:change': 'render',
     },
     initialize: function({ref, map}) {
         // Store key vals
         this.ref = ref;
         this.map = map;
-        this.icon = makeIcon(this.tpl(ref.name, ref.icon));
-        this.marker = makeMarker(ref, this.icon, map);
+
+        this.marker = makeMarker(
+            (ref.x) ? L.latLng(ref.x, ref.y) : map.getCenter(),
+        );
+        // Add to map
+        this.marker.addTo(this.map);
 
         // Register events
         this.marker.on('click', (e) => this.trigger('marker:click', e));
         this.marker.on('dblclick', (e) => this.trigger('marker:dblclick', e));
         this.marker.on('dragend', (e) => this.trigger('marker:dragend', e));
         this.marker.on('contextmenu', (e) => this.trigger('marker:contextmenu', e));
+
+        this.ref.on('update:name', (e) => this.trigger('data:change', e));
+        this.ref.on('update:icon', (e) => this.trigger('data:change', e));
+
+        // Make icon
         this.render();
     },
     template: (name, icon) => {
@@ -73,16 +65,11 @@ export default Component.define({
     },
     characterClick: function(event) {
         event.preventDefault;
-        console.log('click me');
     },
     characterDblClick: function(event) {
         event.preventDefault;
         // Going old school for now
-
-        const name = prompt('Rename?', this.ref.name);
-        if (name) {
-            event.target._icon.querySelector('span').innerText = this.ref.name = name;
-        }
+        SpawnModal.make({target: this.ref});
     },
     characterDragend: function(event) {
         const latLng = event.target.getLatLng();
@@ -98,7 +85,13 @@ export default Component.define({
         }
     },
     render: function() {
-        // Add to map
-        this.marker.addTo(this.map);
+        this.marker.setIcon(
+            L.divIcon({
+                className: 'character-icon',
+                html: this.tpl(this.ref.name, this.ref.icon),
+                iconSize: [60, 80],
+                iconAnchor: [35, 35],
+            }),
+        );
     },
 });
