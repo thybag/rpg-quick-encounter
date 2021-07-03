@@ -1,30 +1,29 @@
 import Component from 'lumpjs/src/component.js';
-import Template from '../../utils/template.js';
 import ImagePicker from './ImagePicker.js';
 import getIconImage, {getRandomMonsterIcon} from '../../utils/getIconImage.js';
 
-const controlTpl = new Template({
-    template: () => {
-        const defaultIcon = getRandomMonsterIcon();
-        return `
-      <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
-      <div>
-          <label>Name</label>
-          <input type="text" value="Unknown">
-          <input type='submit' value="Spawn">
-      </div>
-    `;
-    },
-});
-
 export default Component.define({
     initialize: function(options) {
-        this.el = controlTpl.render();
-        this.el.className = 'spawn-controls';
+        // Render base template
+        this.el = this.tpl();
         this.el.style.display = 'none';
+
+        // Create self on the global level as needed.
         document.body.appendChild(this.el);
 
         this.picker = null;
+    },
+    className: 'spawn-controls',
+    template: () => {
+        const defaultIcon = getRandomMonsterIcon();
+        return `
+          <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
+          <div>
+              <label>Name</label>
+              <input type="text" value="Unknown">
+              <input type='submit' value="Spawn">
+          </div>
+        `;
     },
     prop: {
         visible: false,

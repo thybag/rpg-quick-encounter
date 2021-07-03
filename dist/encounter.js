@@ -1,6 +1,65 @@
 (function () {
     'use strict';
 
+    /**
+     * [safeText description]
+     * @param  {[type]} text [description]
+     * @return {[type]}      [description]
+     */
+    function safeText$1(text) {
+        // Recusivly make sub objects safe
+        if (typeof text === 'object') {
+            return text.map((value) => {
+                return safeText$1(value);
+            });
+        }
+
+        // Render as text node
+        const html = document.createElement('p');
+        html.appendChild(document.createTextNode(text));
+        return html.innerHTML;
+    }
+
+    /**
+     * Create a reusable template
+     * Currently all params passed to render are assumed to be primatives
+     *
+     * @param {[type]} methods [description]
+     */
+    function Template$1(methods) {
+        this.render = function(...args) {
+            // Escape input values
+            if (methods.safe !== false) {
+                // Ensure args are safe
+                args = args.map((value) => {
+                    return safeText$1(value);
+                });
+            }
+
+            // Render template itself
+            const container = document.createElement('div');
+            const tpl = methods.template(...args);
+            container.innerHTML = tpl;
+
+            if (methods.className) {
+                container.className = methods.className;
+            }
+
+            // Return element
+            return container;
+        };
+    }
+
+    /**
+     * Make a new Template
+     *
+     * @param  {...[type]} args [description]
+     * @return {[type]}         [description]
+     */
+    function makeTemplate(...args) {
+        return new Template$1(...args);
+    }
+
     // Use whitelist to determine if events exist.
     // In many cases only the "target" will have these & we will be catching the bubbled version.
     const nativeEvents = [
@@ -41,6 +100,11 @@
             // Create el if none provided.
             if (!this.el) {
                 this.el = document.createElement('div');
+            }
+
+            // Init templates
+            if (this.template) {
+                this._template = makeTemplate({template: this.template, className: this.className});
             }
 
             /* eslint-disable prefer-rest-params */
@@ -131,6 +195,15 @@
         // Placeholders
         ComponentImplementation.prototype.initialize = function() {};
         ComponentImplementation.prototype.render = function() {};
+
+        // Template helpers
+        ComponentImplementation.prototype.template = null;
+        ComponentImplementation.prototype.tpl = function(...args) {
+            if (!this._template) {
+                throw new Error('This component does not implement a template');
+            }
+            return this._template.render(...args);
+        };
 
         // Factory features
         this.config = [];
@@ -17414,47 +17487,6 @@
         return leafletSrc.fog(map.getBounds()).addTo(map);
     }
 
-    /**
-     * Make text safe to include in html
-     *
-     * @param  {[type]} text [description]
-     * @return {[type]}      [description]
-     */
-    function safeText(text) {
-        // Render as text node
-        const html = document.createElement('p');
-        html.appendChild(document.createTextNode(text));
-        return html.innerHTML;
-    }
-
-    /**
-     * Create a reusable template
-     * @param {[type]} methods [description]
-     */
-    function Template(methods) {
-        this.render = function(...args) {
-            // Escape input values
-            if (methods.safe !== false) {
-                // Ensure args are safe
-                args = args.map((value) => {
-                    return safeText(value);
-                });
-            }
-
-            // Render template itself
-            const container = document.createElement('div');
-            const tpl = methods.template(...args);
-            container.innerHTML = tpl;
-
-            if (methods.className) {
-                container.className = methods.className;
-            }
-
-            // Return element
-            return container;
-        };
-    }
-
     let allocated = 0;
 
     /**
@@ -17612,26 +17644,16 @@
         return icon;
     }
 
-    const iconTpl = new Template({
-        template: (name, icon) => {
-            return `
-        <img src="${getIconImage(icon)}">
-        <span>${name}</span>
-    `;
-        },
-    });
-
     /**
      * Make Icon
      *
-     * @param  {[type]} name [description]
-     * @param  {[type]} icon [description]
+     * @param  {[type]} markup [description]
      * @return {[type]}      [description]
      */
-    function makeIcon(name, icon) {
+    function makeIcon(markup) {
         return leafletSrc.divIcon({
             className: 'character-icon',
-            html: iconTpl.render(name, icon),
+            html: markup,
             iconSize: [60, 80],
             iconAnchor: [35, 35],
         });
@@ -17672,7 +17694,7 @@
             // Store key vals
             this.ref = ref;
             this.map = map;
-            this.icon = makeIcon(ref.name, ref.icon);
+            this.icon = makeIcon(this.tpl(ref.name, ref.icon));
             this.marker = makeMarker(ref, this.icon, map);
 
             // Register events
@@ -17681,6 +17703,12 @@
             this.marker.on('dragend', (e) => this.trigger('marker:dragend', e));
             this.marker.on('contextmenu', (e) => this.trigger('marker:contextmenu', e));
             this.render();
+        },
+        template: (name, icon) => {
+            return `
+            <img src="${getIconImage(icon)}">
+            <span>${name}</span>
+        `;
         },
         panTo: function() {
             this.map.panTo(this.marker.getLatLng());
@@ -17885,6 +17913,47 @@
         });
     }
 
+    /**
+     * Make text safe to include in html
+     *
+     * @param  {[type]} text [description]
+     * @return {[type]}      [description]
+     */
+    function safeText(text) {
+        // Render as text node
+        const html = document.createElement('p');
+        html.appendChild(document.createTextNode(text));
+        return html.innerHTML;
+    }
+
+    /**
+     * Create a reusable template
+     * @param {[type]} methods [description]
+     */
+    function Template(methods) {
+        this.render = function(...args) {
+            // Escape input values
+            if (methods.safe !== false) {
+                // Ensure args are safe
+                args = args.map((value) => {
+                    return safeText(value);
+                });
+            }
+
+            // Render template itself
+            const container = document.createElement('div');
+            const tpl = methods.template(...args);
+            container.innerHTML = tpl;
+
+            if (methods.className) {
+                container.className = methods.className;
+            }
+
+            // Return element
+            return container;
+        };
+    }
+
     const playerMap = new WeakMap();
 
     const playerCardTpl = new Template({
@@ -17948,44 +18017,51 @@
         },
     });
 
-    const controlTpl$3 = function(fogProps) {
-        const tpl = `
-        <label>
-            <span>Fog opacity</span>
-            <input type="range" min="1" max="100" value="${fogProps.opacity}" name='opacity'>
-        </label>
-        <label>
-            <span>Fog clear size</span>
-            <input type="range" min="1" max="100" value="${fogProps.clearSize}" name='clearSize'>
-        </label>
-        <label class="enable">
-            <span>Fog enabled</span>
-            <span class="toggle">
-                <input type="checkbox" name='enabled' checked>
-                <span></span>
-          </span>
-        </label>
-    `;
-        const template = document.createElement('div');
-        template.innerHTML = tpl;
-        return template;
-    };
-
+    /**
+     * Fog Control Component.
+     * Allows user to control clear sizing, fog opacity and other related settings.
+     *
+     */
     var FogControls = Component$1.define({
         initialize: function(options) {
-            this.el = controlTpl$3(this.fogProps);
-            this.el.className = 'fog-controls';
+            // Config template
+            this.el = this.tpl(this.fogProps.opacity, this.fogProps.clearSize);
             this.el.style.display = 'none';
+
+            // Create self on parent
             document.body.appendChild(this.el);
         },
-        prop: {
-            visible: false,
-        },
+        // Events
         events: {
             'click input[name=enabled]': 'toggleFog',
             'change input[name=opacity]': 'changeOpacity',
             'change input[name=clearSize]': 'changeClearSize',
         },
+        // Template
+        className: 'fog-controls',
+        template: (opacity, clearSize) => {
+            return `
+            <label>
+                <span>Fog opacity</span>
+                <input type="range" min="1" max="100" value="${opacity}" name='opacity'>
+            </label>
+            <label>
+                <span>Fog clear size</span>
+                <input type="range" min="1" max="100" value="${clearSize}" name='clearSize'>
+            </label>
+            <label class="enable">
+                <span>Fog enabled</span>
+                <span class="toggle">
+                    <input type="checkbox" name='enabled' checked>
+                    <span></span>
+              </span>
+            </label>
+        `;
+        },
+        prop: {
+            visible: false,
+        },
+        // Actions
         toggleFog: function(e, target) {
             this.fogProps.enabled = target.checked;
         },
@@ -18016,15 +18092,6 @@
         },
     });
 
-    const controlTpl$2 = new Template({
-        template: () => {
-            return `
-      <main></main>
-      <footer><button>Cancel</button></footer>
-    `;
-        },
-    });
-
     const iconList$1 = new Template({
         template: () => {
             let NPCList = ''; let MonsterList = ''; let CustomList = '';
@@ -18041,7 +18108,8 @@
 
             return `
       <div>Your images</div>
-          <span>+</span>  ${CustomList}
+          <span>+</span> 
+          ${CustomList}
       <div>NPCs/Players</div>
           ${NPCList}
       <div>Monsters</div>
@@ -18090,10 +18158,18 @@
 
     var ImagePicker$1 = Component$1.define({
         initialize: function(options) {
-            this.el = controlTpl$2.render();
-            this.el.className = 'image-picker';
+            this.el = this.tpl();
             this.el.style.display = 'none';
+
+            // Add to world
             document.body.appendChild(this.el);
+        },
+        className: 'image-picker',
+        template: () => {
+            return `
+          <main></main>
+          <footer><button>Cancel</button></footer>
+        `;
         },
         parent: null,
         prop: {
@@ -18177,28 +18253,28 @@
         },
     });
 
-    const controlTpl$1 = new Template({
-        template: () => {
-            const defaultIcon = getRandomMonsterIcon();
-            return `
-      <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
-      <div>
-          <label>Name</label>
-          <input type="text" value="Unknown">
-          <input type='submit' value="Spawn">
-      </div>
-    `;
-        },
-    });
-
     var SpawnControls = Component$1.define({
         initialize: function(options) {
-            this.el = controlTpl$1.render();
-            this.el.className = 'spawn-controls';
+            // Render base template
+            this.el = this.tpl();
             this.el.style.display = 'none';
+
+            // Create self on the global level as needed.
             document.body.appendChild(this.el);
 
             this.picker = null;
+        },
+        className: 'spawn-controls',
+        template: () => {
+            const defaultIcon = getRandomMonsterIcon();
+            return `
+          <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
+          <div>
+              <label>Name</label>
+              <input type="text" value="Unknown">
+              <input type='submit' value="Spawn">
+          </div>
+        `;
         },
         prop: {
             visible: false,
@@ -18249,23 +18325,13 @@
         },
     });
 
-    const controlsTpl = new Template({
-        template: () => {
-            return `
-        <a href="https://github.com/thybag/rpg-quick-encounter" target="_blank">Help</a>
-        <span class='fog'>Fog</span>
-        <span class="spawn">Spawn</span>
-    `;
-        },
-    });
-
     var Controls = Component$1.define({
         initialize: function(config) {
         // SetID
             this.el.id = 'control-bar';
 
             // Render controls
-            this.el.appendChild(controlsTpl.render());
+            this.el.appendChild(this.tpl());
 
             this.fogControls = FogControls.make({fogProps: config.state.get('fog')});
             this.spawnControls = SpawnControls.make();
@@ -18275,6 +18341,13 @@
             this.spawnControls.on('map:spawn', (v) => {
                 this.trigger('map:spawn', v);
             });
+        },
+        template: () => {
+            return `
+            <a href="https://github.com/thybag/rpg-quick-encounter" target="_blank">Help</a>
+            <span class='fog'>Fog</span>
+            <span class="spawn">Spawn</span>
+        `;
         },
         events: {
             'click span.fog': 'fogToggle',
@@ -18293,28 +18366,28 @@
 
     /**
      * Migrate map data to latest structures
-     * 
+     *
      * @param  {[type]} data [description]
      * @return {[type]}      [description]
      */
     function migrateMapData(data) {
-    	// Initial migration to data version 3.
-    	// No major changes to structure have yet been made, so this is
-    	// mostly just stripping out legacy data points.
-    	if (!data['data:version'] || data['data:version'] < 3) {
-    		data = {
-    			map: data.map,
-    			players: data.players,
-    			spawns: data.spawns,
-    			fog: data.fog,	
-    			icon: data.icon,
-    			'data:version': 3
-    		};
-    	}
+        // Initial migration to data version 3.
+        // No major changes to structure have yet been made, so this is
+        // mostly just stripping out legacy data points.
+        if (!data['data:version'] || data['data:version'] < 3) {
+            data = {
+                'map': data.map,
+                'players': data.players,
+                'spawns': data.spawns,
+                'fog': data.fog,
+                'icon': data.icon,
+                'data:version': 3,
+            };
+        }
 
-    	// v4 yet to come...
+        // v4 yet to come...
 
-    	return data;
+        return data;
     }
 
     const setAppState = function(newState) {
@@ -18372,6 +18445,12 @@
     function applyDefaults(options = {}) {
         return applySettings(base, options);
     }
+
+    var debounce = (callback, time = 250, interval) =>
+        (...args) => {
+            clearTimeout(interval);
+            interval = setTimeout(() => callback(...args), time);
+        };
 
     var Encounter = Component$1.define({
         initialize: function(config) {
@@ -18435,19 +18514,14 @@
             });
 
             // Save local storage
-            mapState.on('updated', () => {
-                console.log(JSON.stringify(mapState.data));
-                localData.saveMap(mapState.get('map'), mapState.data);
-            });
-        },
-    });
-
-    const controlTpl = new Template({
-        template: () => {
-            return `
-      <main></main>
-      <footer><button>Cancel</button></footer>
-    `;
+            mapState.on('updated', debounce(
+                () => {
+                    // Avoid unneeded saves
+                    //
+                    localData.saveMap(mapState.get('map'), mapState.data);
+                    console.log(JSON.parse(JSON.stringify(mapState.data)));
+                }, 50),
+            );
         },
     });
 
@@ -18467,7 +18541,8 @@
 
             return `
       <div>Your images</div>
-          <span>+</span>  ${CustomList}
+          <span>+</span> 
+          ${CustomList}
       <div>NPCs/Players</div>
           ${NPCList}
       <div>Monsters</div>
@@ -18516,10 +18591,18 @@
 
     var ImagePicker = Component$1.define({
         initialize: function(options) {
-            this.el = controlTpl.render();
-            this.el.className = 'image-picker';
+            this.el = this.tpl();
             this.el.style.display = 'none';
+
+            // Add to world
             document.body.appendChild(this.el);
+        },
+        className: 'image-picker',
+        template: () => {
+            return `
+          <main></main>
+          <footer><button>Cancel</button></footer>
+        `;
         },
         parent: null,
         prop: {
@@ -18688,34 +18771,6 @@
         },
     });
 
-    const wizardTpl = new Template({
-        template: () => {
-            return `
-      <div class="wizard">
-          <h1>Start your new Encounter!</h1>
-          <main>
-              <p>
-                  <strong>RPG quick encounter</strong> is an online tool to help you get up and running with 
-                  your next encounter in moments.
-              </p>
-              <hr>
-
-              <label>Paste the link to the map you'd like to use</label>
-              <input type='url' name="map" placeholder="https://..." required>
-              
-              <span class='more'>More options</span>
-              <div class="advanced">
-                 
-              </div>
-          </main>
-          <footer>
-              <button class="submit">Start your encounter</button>
-          </footer>
-      </div>
-    `;
-        },
-    });
-
     const savesTlp = new Template({
         'template': (saves) => {
             return `
@@ -18736,10 +18791,34 @@
             const setup = applyDefaults();
             localData.setDataPrefix(setup.config.dataPrefix);
 
-
-            this.el = wizardTpl.render();
+            this.el = this.tpl();
             document.body.appendChild(this.el);
             this.render();
+        },
+        template: () => {
+            return `
+          <div class="wizard">
+              <h1>Start your new Encounter!</h1>
+              <main>
+                  <p>
+                      <strong>RPG quick encounter</strong> is an online tool to help you get up and running with 
+                      your next encounter in moments.
+                  </p>
+                  <hr>
+
+                  <label>Paste the link to the map you'd like to use</label>
+                  <input type='url' name="map" placeholder="https://..." required>
+                  
+                  <span class='more'>More options</span>
+                  <div class="advanced">
+                     
+                  </div>
+              </main>
+              <footer>
+                  <button class="submit">Start your encounter</button>
+              </footer>
+          </div>
+        `;
         },
         playersComponent: null,
         events: {
@@ -18791,8 +18870,12 @@
 
             // Do you have any saved maps?
             const saves = localData.getMaps();
+
+
             if (saves.length !== 0) {
+                const height = Math.ceil(saves.length/5) * 156;
                 const saveZone = savesTlp.render(saves);
+                saveZone.style.height = `${height}px`;
                 saveZone.className = 'save-zone';
                 this.el.appendChild(saveZone);
             }

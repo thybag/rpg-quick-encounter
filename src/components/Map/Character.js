@@ -1,28 +1,17 @@
 import L from 'leaflet';
-import Template from '../../utils/template.js';
 import Component from 'lumpjs/src/component.js';
 import getIconImage from '../../utils/getIconImage.js';
-
-const iconTpl = new Template({
-    template: (name, icon) => {
-        return `
-        <img src="${getIconImage(icon)}">
-        <span>${name}</span>
-    `;
-    },
-});
 
 /**
  * Make Icon
  *
- * @param  {[type]} name [description]
- * @param  {[type]} icon [description]
+ * @param  {[type]} markup [description]
  * @return {[type]}      [description]
  */
-function makeIcon(name, icon) {
+function makeIcon(markup) {
     return L.divIcon({
         className: 'character-icon',
-        html: iconTpl.render(name, icon),
+        html: markup,
         iconSize: [60, 80],
         iconAnchor: [35, 35],
     });
@@ -63,7 +52,7 @@ export default Component.define({
         // Store key vals
         this.ref = ref;
         this.map = map;
-        this.icon = makeIcon(ref.name, ref.icon);
+        this.icon = makeIcon(this.tpl(ref.name, ref.icon));
         this.marker = makeMarker(ref, this.icon, map);
 
         // Register events
@@ -72,6 +61,12 @@ export default Component.define({
         this.marker.on('dragend', (e) => this.trigger('marker:dragend', e));
         this.marker.on('contextmenu', (e) => this.trigger('marker:contextmenu', e));
         this.render();
+    },
+    template: (name, icon) => {
+        return `
+            <img src="${getIconImage(icon)}">
+            <span>${name}</span>
+        `;
     },
     panTo: function() {
         this.map.panTo(this.marker.getLatLng());

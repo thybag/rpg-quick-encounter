@@ -10,6 +10,7 @@ import migrateMapData from './services/mapMigrate.js';
 import {setMapState, setAppState} from './utils/state.js';
 
 import applyDefaults from './utils/applyDefaults.js';
+import debounce from './utils/debounce.js';
 import {setIconPath} from './utils/getIconImage.js';
 
 export default Component.define({
@@ -75,9 +76,13 @@ export default Component.define({
         });
 
         // Save local storage
-        mapState.on('updated', () => {
-            console.log(JSON.stringify(mapState.data));
-            localData.saveMap(mapState.get('map'), mapState.data);
-        });
+        mapState.on('updated', debounce(
+            () => {
+                // Avoid unneeded saves
+                //
+                localData.saveMap(mapState.get('map'), mapState.data);
+                console.log(JSON.parse(JSON.stringify(mapState.data)));
+            }, 50),
+        );
     },
 });

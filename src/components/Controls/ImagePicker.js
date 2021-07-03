@@ -12,15 +12,6 @@ import getIconImage,
     from '../../utils/getIconImage.js';
 
 
-const controlTpl = new Template({
-    template: () => {
-        return `
-      <main></main>
-      <footer><button>Cancel</button></footer>
-    `;
-    },
-});
-
 const iconList = new Template({
     template: () => {
         let NPCList = ''; let MonsterList = ''; let CustomList = '';
@@ -37,7 +28,8 @@ const iconList = new Template({
 
         return `
       <div>Your images</div>
-          <span>+</span>  ${CustomList}
+          <span>+</span> 
+          ${CustomList}
       <div>NPCs/Players</div>
           ${NPCList}
       <div>Monsters</div>
@@ -86,10 +78,18 @@ async function imageToIcon(iconImg) {
 
 export default Component.define({
     initialize: function(options) {
-        this.el = controlTpl.render();
-        this.el.className = 'image-picker';
+        this.el = this.tpl();
         this.el.style.display = 'none';
+
+        // Add to world
         document.body.appendChild(this.el);
+    },
+    className: 'image-picker',
+    template: () => {
+        return `
+          <main></main>
+          <footer><button>Cancel</button></footer>
+        `;
     },
     parent: null,
     prop: {

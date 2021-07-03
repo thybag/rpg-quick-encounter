@@ -9,10 +9,10 @@
   "lumpjs": "git+ssh://git@github.com/thybag/lump.js.git"
  },
  "scripts": {
-  "start": "rollup -c --watch",
+  "start": "yarn watch",
   "watch": "rollup -c --watch",
   "build": "rollup -c",
-  "lint": "eslint src --fix"
+  "lint": "eslint src"
  },
  "devDependencies": {
   "@rollup/plugin-commonjs": "^17.1.0",

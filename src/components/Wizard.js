@@ -8,34 +8,6 @@ import Template from '../utils/template.js';
 // utils
 import checkImage from '../utils/checkImage.js';
 
-const wizardTpl = new Template({
-    template: () => {
-        return `
-      <div class="wizard">
-          <h1>Start your new Encounter!</h1>
-          <main>
-              <p>
-                  <strong>RPG quick encounter</strong> is an online tool to help you get up and running with 
-                  your next encounter in moments.
-              </p>
-              <hr>
-
-              <label>Paste the link to the map you'd like to use</label>
-              <input type='url' name="map" placeholder="https://..." required>
-              
-              <span class='more'>More options</span>
-              <div class="advanced">
-                 
-              </div>
-          </main>
-          <footer>
-              <button class="submit">Start your encounter</button>
-          </footer>
-      </div>
-    `;
-    },
-});
-
 const savesTlp = new Template({
     'template': (saves) => {
         return `
@@ -56,10 +28,34 @@ export default Component.define({
         const setup = applyDefaults();
         localData.setDataPrefix(setup.config.dataPrefix);
 
-
-        this.el = wizardTpl.render();
+        this.el = this.tpl();
         document.body.appendChild(this.el);
         this.render();
+    },
+    template: () => {
+        return `
+          <div class="wizard">
+              <h1>Start your new Encounter!</h1>
+              <main>
+                  <p>
+                      <strong>RPG quick encounter</strong> is an online tool to help you get up and running with 
+                      your next encounter in moments.
+                  </p>
+                  <hr>
+
+                  <label>Paste the link to the map you'd like to use</label>
+                  <input type='url' name="map" placeholder="https://..." required>
+                  
+                  <span class='more'>More options</span>
+                  <div class="advanced">
+                     
+                  </div>
+              </main>
+              <footer>
+                  <button class="submit">Start your encounter</button>
+              </footer>
+          </div>
+        `;
     },
     playersComponent: null,
     events: {
@@ -111,8 +107,12 @@ export default Component.define({
 
         // Do you have any saved maps?
         const saves = localData.getMaps();
+
+
         if (saves.length !== 0) {
+            const height = Math.ceil(saves.length/5) * 156;
             const saveZone = savesTlp.render(saves);
+            saveZone.style.height = `${height}px`;
             saveZone.className = 'save-zone';
             this.el.appendChild(saveZone);
         }

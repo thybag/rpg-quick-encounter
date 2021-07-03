@@ -1,17 +1,6 @@
 import Component from 'lumpjs/src/component.js';
 import FogControls from './Controls/FogControls.js';
 import SpawnControls from './Controls/SpawnControls.js';
-import Template from '../utils/template.js';
-
-const controlsTpl = new Template({
-    template: () => {
-        return `
-        <a href="https://github.com/thybag/rpg-quick-encounter" target="_blank">Help</a>
-        <span class='fog'>Fog</span>
-        <span class="spawn">Spawn</span>
-    `;
-    },
-});
 
 export default Component.define({
     initialize: function(config) {
@@ -19,7 +8,7 @@ export default Component.define({
         this.el.id = 'control-bar';
 
         // Render controls
-        this.el.appendChild(controlsTpl.render());
+        this.el.appendChild(this.tpl());
 
         this.fogControls = FogControls.make({fogProps: config.state.get('fog')});
         this.spawnControls = SpawnControls.make();
@@ -29,6 +18,13 @@ export default Component.define({
         this.spawnControls.on('map:spawn', (v) => {
             this.trigger('map:spawn', v);
         });
+    },
+    template: () => {
+        return `
+            <a href="https://github.com/thybag/rpg-quick-encounter" target="_blank">Help</a>
+            <span class='fog'>Fog</span>
+            <span class="spawn">Spawn</span>
+        `;
     },
     events: {
         'click span.fog': 'fogToggle',
