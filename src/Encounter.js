@@ -6,6 +6,7 @@ import Players from './components/PlayerBar.js';
 import Controls from './components/Controls.js';
 
 import localData from './services/localData.js';
+import migrateMapData from './services/mapMigrate.js';
 import {setMapState, setAppState} from './utils/state.js';
 
 import applyDefaults from './utils/applyDefaults.js';
@@ -26,7 +27,9 @@ export default Component.define({
 
         // Reload saved map state
         if (localData.hasMap(setup.data.map) && config.save !== 'false') {
-            setup.data = localData.loadMap(setup.data.map);
+            // migrateMapData will ensure map data version is updated to
+            // the latest format
+            setup.data = migrateMapData(localData.loadMap(setup.data.map));
         }
 
         // Setup map as reactive model

@@ -2,7 +2,7 @@ const base = {
     // App config
     config: {
         'assetPath': 'assets/',
-        'dataPrefix': 'qrpg-',
+        'dataPrefix': '',
     },
     // Encounter data
     data: {
