@@ -1,5 +1,11 @@
 import * as turf from '@turf/turf';
 
+/**
+ * Convert multi polygon geojson to array of lat/lng pairs
+ *
+ * @param  {[type]} mpoly [description]
+ * @return {[type]}       [description]
+ */
 function mployToPairs(mpoly) {
     return mpoly.map((poly) => {
         if (poly.lat) return [poly.lat, poly.lng];
@@ -8,7 +14,10 @@ function mployToPairs(mpoly) {
     });
 }
 
-// Keep track of cut out sections
+/**
+ * Keep track of cut out sections
+ * @return {[type]} [description]
+ */
 export default new function() {
     this.cutouts = null;
 

@@ -1,3 +1,10 @@
+/**
+ * Create a polygon to represent a circle of a given size
+ *
+ * @param  {[type]} center [description]
+ * @param  {[type]} radius [description]
+ * @return {[type]}        [description]
+ */
 export default function(center, radius) {
     const n = 20;
     const angles = 2 * Math.PI / n;

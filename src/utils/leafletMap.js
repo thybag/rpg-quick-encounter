@@ -1,7 +1,13 @@
 import L from 'leaflet';
 import checkImage from './checkImage.js';
 
-
+/**
+ * Create leaflet map instance based on provided image
+ *
+ * @param  {[type]} target  [description]
+ * @param  {[type]} mapPath [description]
+ * @return {[type]}         [description]
+ */
 export default async function(target, mapPath) {
     const img = await checkImage(mapPath);
 
@@ -18,6 +24,7 @@ export default async function(target, mapPath) {
 
     L.imageOverlay(mapPath, bounds).addTo(map);
     map.fitBounds(bounds);
+
     // Config defualt map zoom.
     const zoom = map.getZoom();
     map.setZoom(zoom + 0.5);

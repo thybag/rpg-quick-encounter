@@ -1,5 +1,9 @@
 let allocated = 0;
 
+/**
+ * UID
+ * @return {string} Unique ID for this instance
+ */
 function uid() {
     return (new Date().getTime()) + '_' + (allocated++);
 }

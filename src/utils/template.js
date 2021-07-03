@@ -1,4 +1,9 @@
-
+/**
+ * Make text safe to include in html
+ *
+ * @param  {[type]} text [description]
+ * @return {[type]}      [description]
+ */
 function safeText(text) {
     // Render as text node
     const html = document.createElement('p');
@@ -6,9 +11,13 @@ function safeText(text) {
     return html.innerHTML;
 }
 
+/**
+ * Create a reusable template
+ * @param {[type]} methods [description]
+ */
 function Template(methods) {
     this.render = function(...args) {
-    // Escape input values
+        // Escape input values
         if (methods.safe !== false) {
             // Ensure args are safe
             args = args.map((value) => {

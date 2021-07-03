@@ -18,7 +18,7 @@ const setMapState = function(newState) {
 
 export {
     getAppState,
- 	setAppState,
- 	getMapState,
- 	setMapState,
+    setAppState,
+    getMapState,
+    setMapState,
 };

@@ -6,7 +6,7 @@ import Players from './components/PlayerBar.js';
 import Controls from './components/Controls.js';
 
 import localData from './services/localData.js';
-import {getMapState, setMapState, setAppState, getAppState} from './utils/state.js';
+import {setMapState, setAppState} from './utils/state.js';
 
 import applyDefaults from './utils/applyDefaults.js';
 import {setIconPath} from './utils/getIconImage.js';
@@ -19,9 +19,10 @@ export default Component.define({
         // Apply defaults and sanity check
         const setup = applyDefaults(config.options);
         setAppState(setup.config);
-        console.log(setup.config.dataPrefix);
-        // Set storage key
+
+        // Configure app
         localData.setDataPrefix(setup.config.dataPrefix);
+        setIconPath(setup.config.assetPath);
 
         // Reload saved map state
         if (localData.hasMap(setup.data.map) && config.save !== 'false') {

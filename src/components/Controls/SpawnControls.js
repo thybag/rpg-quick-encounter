@@ -40,12 +40,12 @@ export default Component.define({
         this.picker.open(target);
     },
     save: function(e, target) {
-    // default
+        // default
         if (this.prop.mode == 'spawn') {
-            this.trigger('map:spawn', {name: this.el.querySelector('input[type=text]').value, icon: this.el.querySelector('img').dataset.id});
-        }
-        if (this.prop.mode == 'edit') {
-
+            this.trigger('map:spawn', {
+                name: this.el.querySelector('input[type=text]').value,
+                icon: this.el.querySelector('img').dataset.id,
+            });
         }
     },
     toggle: function() {

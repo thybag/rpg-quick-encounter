@@ -23,6 +23,13 @@ const base = {
     },
 };
 
+/**
+ * Override default setting data with provided values
+ *
+ * @param  {[type]} base      [description]
+ * @param  {[type]} overrides [description]
+ * @return {[type]}           [description]
+ */
 function applySettings(base, overrides) {
     for (const [key, value] of Object.entries(overrides)) {
         if (typeof value === 'object' && value !== null) {
@@ -34,6 +41,12 @@ function applySettings(base, overrides) {
     return base;
 }
 
+/**
+ * Get settings for app
+ *
+ * @param  {Object} options [description]
+ * @return {[type]}         [description]
+ */
 export default function(options = {}) {
     return applySettings(base, options);
 }

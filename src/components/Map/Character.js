@@ -12,6 +12,13 @@ const iconTpl = new Template({
     },
 });
 
+/**
+ * Make Icon
+ *
+ * @param  {[type]} name [description]
+ * @param  {[type]} icon [description]
+ * @return {[type]}      [description]
+ */
 function makeIcon(name, icon) {
     return L.divIcon({
         className: 'character-icon',
@@ -21,6 +28,14 @@ function makeIcon(name, icon) {
     });
 }
 
+/**
+ * Make Leaflet Marker
+ *
+ * @param  {[type]} ref  [description]
+ * @param  {[type]} icon [description]
+ * @param  {[type]} map  [description]
+ * @return {[type]}      [description]
+ */
 function makeMarker(ref, icon, map) {
     const position = (ref.x) ? L.latLng(ref.x, ref.y) : map.getCenter();
     return L.marker(
@@ -37,6 +52,7 @@ export default Component.define({
     icon: null,
     ref: null,
     map: null,
+    // Events
     events: {
         'marker:click': 'characterClick',
         'marker:dblclick': 'characterDblClick',
@@ -44,7 +60,7 @@ export default Component.define({
         'marker:contextmenu': 'characterRemove',
     },
     initialize: function({ref, map}) {
-    // Store key vals
+        // Store key vals
         this.ref = ref;
         this.map = map;
         this.icon = makeIcon(ref.name, ref.icon);
@@ -87,7 +103,7 @@ export default Component.define({
         }
     },
     render: function() {
-    // Add to map
+        // Add to map
         this.marker.addTo(this.map);
     },
 });

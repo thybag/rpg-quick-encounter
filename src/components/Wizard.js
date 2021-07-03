@@ -1,7 +1,6 @@
 import Component from 'lumpjs/src/component.js';
 import AddPlayers from './Wizard/AddPlayers.js';
 
-
 import applyDefaults from '../utils/applyDefaults';
 import localData from '../services/localData';
 

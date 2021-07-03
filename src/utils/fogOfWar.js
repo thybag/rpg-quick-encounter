@@ -46,6 +46,12 @@ L.fog = function(bounds, options) {
     return new L.Fog(bounds, options);
 };
 
+/**
+ * Create fog layer
+ *
+ * @param  {[type]} map [description]
+ * @return {[type]}     [description]
+ */
 export default function(map) {
     // Create fog of war mask
     return L.fog(map.getBounds()).addTo(map);

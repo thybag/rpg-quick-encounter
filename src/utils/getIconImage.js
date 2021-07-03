@@ -45,7 +45,12 @@ const setIconPath = function(path) {
     iconPath = path;
 };
 
-// Convert icon to image path
+/**
+ * Convert icon to a usable image path
+ *
+ * @param  {[type]} icon [description]
+ * @return {[type]}      [description]
+ */
 export default function(icon) {
     if (!icon) {
         return '';
