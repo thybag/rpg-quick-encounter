@@ -14,7 +14,7 @@ const savesTlp = new Template({
       <h2>Your existing saves</h2>
       <main>
           ${saves.map((map) => {
-            return `<a href="?map=${map.map}">
+        return `<a href="?map=${map.map}">
                 <img src="${map.map}" loading="lazy" />
                 <div>
                     Map: <span>${map.map}</span> <br/>
