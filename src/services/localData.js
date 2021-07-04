@@ -84,4 +84,15 @@ export default new function() {
         const players = this._get('players');
         return players || null;
     };
+
+    this.listen = function(map, callback) {
+        if (!this.hasMap(map)) return;
+
+        const dataKey = dataPrefix + mapPrefix + map;
+        window.addEventListener('storage', (change) => {
+            if (change.key === dataKey) {
+                callback(JSON.parse(change.newValue));
+            }
+        });
+    };
 };

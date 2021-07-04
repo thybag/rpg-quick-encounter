@@ -17598,6 +17598,17 @@
             const players = this._get('players');
             return players || null;
         };
+
+        this.listen = function(map, callback) {
+            if (!this.hasMap(map)) return;
+
+            const dataKey = dataPrefix + mapPrefix + map;
+            window.addEventListener('storage', (change) => {
+                if (change.key === dataKey) {
+                    callback(JSON.parse(change.newValue));
+                }
+            });
+        };
     };
 
     // Player icons
@@ -17905,9 +17916,9 @@
 
             // Render base template
             this.el = this.tpl(
-                "Update Mob",
-                this.target.name, 
-                this.target.icon
+                'Update Mob',
+                this.target.name,
+                this.target.icon,
             );
 
             // Create self on the global level as needed.
@@ -17922,7 +17933,7 @@
     });
 
     var ConfirmModal = Component$1.define({
-        callback: function(){},
+        callback: function() {},
         initialize: function(options) {
             this.callback = options.callback;
 
@@ -17957,7 +17968,7 @@
             this.callback();
             this.close();
         },
-       
+
         // Remove modal
         close: function() {
             this.destroy();
@@ -18057,10 +18068,10 @@
             event.preventDefault;
 
             ConfirmModal.make({
-                question: "Remove character from map?",
+                question: 'Remove character from map?',
                 callback: () => {
-                     this.ref.spawned = false;
-                }
+                    this.ref.spawned = false;
+                },
             });
         },
         render: function() {
@@ -18243,7 +18254,7 @@
 
     /**
      * [description]
-     * @param  {[type]} elements [description]
+     * @param  {[type]} el [description]
      */
     function dragSort(el) {
         el.addEventListener('dragend', dragEnd);
@@ -18261,9 +18272,9 @@
             // Render base template
             const defaultIcon = getRandomPlayerIcon();
             this.el = this.tpl(
-                "Add Player",
-                "",
-                defaultIcon
+                'Add Player',
+                '',
+                defaultIcon,
             );
 
             // Create self on the global level as needed.
@@ -18275,7 +18286,7 @@
             this.players.push({
                 name: this.el.querySelector('input[type=text]').value,
                 icon: this.el.querySelector('img').dataset.id,
-                spawned: true
+                spawned: true,
             });
 
             this.close();
@@ -18299,7 +18310,7 @@
             'dblclick div': 'onEdit',
             'contextmenu div': 'onRemove',
             'click div.newPlayer span': 'onNewPlayer',
-            'player:added': 'makePlayerCard'
+            'player:added': 'makePlayerCard',
         },
         template: (name, icon) => {
             return `
@@ -18311,7 +18322,7 @@
             const player = playerMap.get(target).refresh();
             EditMobModal.make({target: player});
         },
-        onRemove: function(e, target){
+        onRemove: function(e, target) {
             e.preventDefault();
 
             const player = playerMap.get(target).refresh();
@@ -18319,7 +18330,7 @@
                 question: 'Remove player from lineup?',
                 callback: () => {
                     player.removed = true;
-                }
+                },
             });
         },
         onNewPlayer: function() {
@@ -18337,7 +18348,7 @@
             // If already spawned lets focus them
             this.trigger('map:player:focus', player);
         },
-        makePlayerCard: function(player){
+        makePlayerCard: function(player) {
             // Skip removed players
             if (player.removed) return;
 
@@ -18349,13 +18360,13 @@
             if (player.spawned) playerCard.classList.add('spawned');
 
             // Insert before the "add new" if needed
-            let addCard = this.el.querySelector('.newPlayer');
+            const addCard = this.el.querySelector('.newPlayer');
             if (addCard) {
-                 this.el.insertBefore(playerCard, addCard);
+                this.el.insertBefore(playerCard, addCard);
             } else {
-                 this.el.appendChild(playerCard);
+                this.el.appendChild(playerCard);
             }
-           
+
             // Makes sortable
             dragSort(playerCard);
 
@@ -18380,14 +18391,14 @@
                 } else {
                     playerCard.classList.remove('spawned');
                 }
-            }); 
+            });
         },
         render: async function() {
             this.players.map((player) => {
                 this.makePlayerCard(player);
             });
-            
-            let newEl = document.createElement('div');
+
+            const newEl = document.createElement('div');
             newEl.className = 'newPlayer';
             newEl.innerHTML ='<span>+</span><span>Add</span>';
             this.el.appendChild(newEl);
@@ -18623,10 +18634,13 @@
     });
 
     var SpawnControls = Component$1.define({
+        spawns: null,
         initialize: function(options) {
             // Render base template
             this.el = this.tpl();
             this.el.style.display = 'none';
+            // Store spawn accessor
+            this.spawns = options.spawns;
 
             // Create self on the global level as needed.
             document.body.appendChild(this.el);
@@ -18655,10 +18669,12 @@
             ImagePicker$1.make({target});
         },
         save: function(e, target) {
-            // default
-            this.trigger('map:spawn', {
+            this.spawns = this.spawns.refresh();
+            this.spawns.push({
                 name: this.el.querySelector('input[type=text]').value,
                 icon: this.el.querySelector('img').dataset.id,
+                id: this.spawnslength,
+                spawned: true,
             });
         },
         toggle: function() {
@@ -18693,13 +18709,8 @@
             this.el.appendChild(this.tpl());
 
             this.fogControls = FogControls.make({fogProps: config.state.get('fog')});
-            this.spawnControls = SpawnControls.make();
+            this.spawnControls = SpawnControls.make({spawns: config.state.get('spawns')});
             this.render();
-
-            // Pass it up
-            this.spawnControls.on('map:spawn', (v) => {
-                this.trigger('map:spawn', v);
-            });
         },
         template: () => {
             return `
@@ -18851,49 +18862,28 @@
             // Boot Core Components
             const map = EncounterMap.make({el: mapEl, state: mapState});
             const players = Players.make({el: playerEl, players: mapState.get('players')});
-            const controls = Controls.make({el: controlEl, state: mapState});
+            Controls.make({el: controlEl, state: mapState});
 
-            /* to refactor */
-            players.on('map:player:spawn', function(player) {
-                map.trigger('map:player:spawn', player);
-            });
-            players.on('map:player:focus', function(player) {
-                map.trigger('map:player:focus', player);
-            });
-
-            controls.on('map:spawn', function(v) {
-                mapState.data.spawns.push({
-                    ...v,
-                    id: mapState.data.spawns.length,
-                    spawned: true,
-                });
+            // Listen for local storage being changed on this map
+            localData.listen(setup.data.map, function(updated) {
+                // update ourselves to match if so.
+                mapState.set('spawns', updated.spawns);
+                mapState.set('fog', updated.fog);
+                mapState.set('players', updated.players);
             });
 
-            // Test code to see if we can sync data between maps
-            window.addEventListener('storage', (change) => {
-                if (change.key == 'map:'+setup.data.map) {
-                    const newData = JSON.parse(change.newValue);
-                    mapState.set('spawns', newData.spawns);
-                    mapState.set('fog', newData.fog);
-                    mapState.set('players', newData.players);
-
-                    console.log('Sync changes');
-                }
-            });
-
-            // Debugging
-            mapState.on('change', function(a, b, c, d) {
-                if (a != 'NONE') console.log('CHANGE', a, b, c, d);
-            });
-
-            // Save local storage
+            // Save changes automatically.
             mapState.on('updated', debounce(
                 () => {
                     // Avoid unneeded saves
                     localData.saveMap(mapState.get('map'), mapState.data);
-                    console.log(JSON.parse(JSON.stringify(mapState.data)));
                 }, 50),
             );
+
+            /* to refactor */
+            players.on('map:player:focus', function(player) {
+                map.trigger('map:player:focus', player);
+            });
         },
     });
 

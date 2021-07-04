@@ -3,10 +3,13 @@ import ImagePicker from './ImagePicker.js';
 import getIconImage, {getRandomMonsterIcon} from '../../utils/getIconImage.js';
 
 export default Component.define({
+    spawns: null,
     initialize: function(options) {
         // Render base template
         this.el = this.tpl();
         this.el.style.display = 'none';
+        // Store spawn accessor
+        this.spawns = options.spawns;
 
         // Create self on the global level as needed.
         document.body.appendChild(this.el);
@@ -35,10 +38,12 @@ export default Component.define({
         ImagePicker.make({target});
     },
     save: function(e, target) {
-        // default
-        this.trigger('map:spawn', {
+        this.spawns = this.spawns.refresh();
+        this.spawns.push({
             name: this.el.querySelector('input[type=text]').value,
             icon: this.el.querySelector('img').dataset.id,
+            id: this.spawnslength,
+            spawned: true,
         });
     },
     toggle: function() {

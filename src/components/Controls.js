@@ -11,13 +11,8 @@ export default Component.define({
         this.el.appendChild(this.tpl());
 
         this.fogControls = FogControls.make({fogProps: config.state.get('fog')});
-        this.spawnControls = SpawnControls.make();
+        this.spawnControls = SpawnControls.make({spawns: config.state.get('spawns')});
         this.render();
-
-        // Pass it up
-        this.spawnControls.on('map:spawn', (v) => {
-            this.trigger('map:spawn', v);
-        });
     },
     template: () => {
         return `

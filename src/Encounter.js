@@ -53,48 +53,27 @@ export default Component.define({
         // Boot Core Components
         const map = EncounterMap.make({el: mapEl, state: mapState});
         const players = Players.make({el: playerEl, players: mapState.get('players')});
-        const controls = Controls.make({el: controlEl, state: mapState});
+        Controls.make({el: controlEl, state: mapState});
 
-        /* to refactor */
-        players.on('map:player:spawn', function(player) {
-            map.trigger('map:player:spawn', player);
-        });
-        players.on('map:player:focus', function(player) {
-            map.trigger('map:player:focus', player);
-        });
-
-        controls.on('map:spawn', function(v) {
-            mapState.data.spawns.push({
-                ...v,
-                id: mapState.data.spawns.length,
-                spawned: true,
-            });
+        // Listen for local storage being changed on this map
+        localData.listen(setup.data.map, function(updated) {
+            // update ourselves to match if so.
+            mapState.set('spawns', updated.spawns);
+            mapState.set('fog', updated.fog);
+            mapState.set('players', updated.players);
         });
 
-        // Test code to see if we can sync data between maps
-        window.addEventListener('storage', (change) => {
-            if (change.key == 'map:'+setup.data.map) {
-                const newData = JSON.parse(change.newValue);
-                mapState.set('spawns', newData.spawns);
-                mapState.set('fog', newData.fog);
-                mapState.set('players', newData.players);
-
-                console.log('Sync changes');
-            }
-        });
-
-        // Debugging
-        mapState.on('change', function(a, b, c, d) {
-            if (a != 'NONE') console.log('CHANGE', a, b, c, d);
-        });
-
-        // Save local storage
+        // Save changes automatically.
         mapState.on('updated', debounce(
             () => {
                 // Avoid unneeded saves
                 localData.saveMap(mapState.get('map'), mapState.data);
-                console.log(JSON.parse(JSON.stringify(mapState.data)));
             }, 50),
         );
+
+        /* to refactor */
+        players.on('map:player:focus', function(player) {
+            map.trigger('map:player:focus', player);
+        });
     },
 });
