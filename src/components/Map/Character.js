@@ -19,6 +19,8 @@ function makeMarker(position) {
     );
 }
 
+let globalZIndexOffset = 0;
+
 export default Component.define({
     marker: null,
     ref: null,
@@ -27,6 +29,7 @@ export default Component.define({
     events: {
         'marker:click': 'characterClick',
         'marker:dblclick': 'characterDblClick',
+        'marker:dragstart': 'characterDragStart',
         'marker:dragend': 'characterDragend',
         'marker:contextmenu': 'characterRemove',
         'data:change': 'render',
@@ -36,15 +39,20 @@ export default Component.define({
         this.ref = ref;
         this.map = map;
 
+        // Set initial position if not already defined.
+        if (!this.ref.x || !this.ref.y) {
+            this.ref.x = map.getCenter().lat;
+            this.ref.y = map.getCenter().lng;
+        }
+
         this.marker = makeMarker(
-            (ref.x) ? L.latLng(ref.x, ref.y) : map.getCenter(),
+            L.latLng(this.ref.x, this.ref.y),
         );
-        // Add to map
-        this.marker.addTo(this.map);
 
         // Register events
         this.marker.on('click', (e) => this.trigger('marker:click', e));
         this.marker.on('dblclick', (e) => this.trigger('marker:dblclick', e));
+        this.marker.on('dragstart', (e) => this.trigger('marker:dragstart', e));
         this.marker.on('dragend', (e) => this.trigger('marker:dragend', e));
         this.marker.on('contextmenu', (e) => this.trigger('marker:contextmenu', e));
 
@@ -64,15 +72,25 @@ export default Component.define({
     },
     characterClick: function(event) {
         event.preventDefault;
+
+        // Bring character to the front
+        globalZIndexOffset++
+        this.marker.setZIndexOffset(globalZIndexOffset*1000);
     },
     characterDblClick: function(event) {
         event.preventDefault;
         // Going old school for now
-        SpawnModal.make({target: this.ref});
+        SpawnModal.make({target: this.ref.refresh()});
+    },
+    characterDragStart: function(event) {
+        // Disable transition effect when we're dragging
+        event.target._icon.classList.add('prevent-animation');
     },
     characterDragend: function(event) {
         const latLng = event.target.getLatLng();
+        event.target._icon.classList.remove('prevent-animation');
         // Sync
+        this.ref = this.ref.refresh();
         this.ref.x = latLng.lat;
         this.ref.y = latLng.lng;
     },
@@ -80,13 +98,17 @@ export default Component.define({
         event.preventDefault;
         if (confirm('Are you sure you want to remove this character?')) {
             this.ref.spawned = false;
-            this.marker.remove();
         }
     },
     render: function() {
         this.ref = this.ref.refresh();
+
         // Sync spawned?
-        // remove / add to map?
+        if (!this.ref.spawned) {
+            this.marker.remove();
+        } else {
+            this.marker.addTo(this.map);
+        }
 
         // Sync position
         this.marker.setLatLng([this.ref.x, this.ref.y]);

@@ -52,7 +52,7 @@ export default Component.define({
 
         // Boot Core Components
         const map = EncounterMap.make({el: mapEl, state: mapState});
-        const players = Players.make({el: playerEl, state: mapState});
+        const players = Players.make({el: playerEl, players: mapState.get('players')});
         const controls = Controls.make({el: controlEl, state: mapState});
 
         /* to refactor */
@@ -64,15 +64,11 @@ export default Component.define({
         });
 
         controls.on('map:spawn', function(v) {
-            const spawn = {
+            mapState.data.spawns.push({
                 ...v,
                 id: mapState.data.spawns.length,
-                x: 0,
-                y: 0,
                 spawned: true,
-            };
-            mapState.data.spawns.push(spawn);
-            map.trigger('map:spawn', mapState.data.spawns[mapState.data.spawns.length - 1]);
+            });
         });
 
         // Test code to see if we can sync data between maps

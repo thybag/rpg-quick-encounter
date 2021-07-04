@@ -51,9 +51,7 @@ export default Component.define({
     },
     // Remove modal
     close: function() {
-        this.disconnect();
-        this.el.remove();
-        this.render();
+        this.destroy();
     },
     // Open image picker
     openPickList: function(e, target) {

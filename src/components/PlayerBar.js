@@ -1,34 +1,32 @@
 import Component from 'lumpjs/src/component.js';
 import dragSort from '../utils/dragSort.js';
-import Template from '../utils/template.js';
 import getIconImage from '../utils/getIconImage.js';
 
 const playerMap = new WeakMap();
 
-const playerCardTpl = new Template({
-    template: (name, icon) => {
-        return `
-        <img src="${getIconImage(icon)}">
-        <span>${name}</span>
-    `;
-    },
-});
-
 export default Component.define({
     initialize: function(config) {
+        // Config player bar.
         this.el.id = 'player-bar';
-        this.state = config.state;
+
+        this.players = config.players;
         this.render();
     },
     events: {
-        'click div': 'playerSelect',
+        'click div': 'onPlayerSelect',
     },
-    playerSelect: function(e, target) {
-        const player = playerMap.get(target);
+    template: (name, icon) => {
+        return `
+            <img src="${getIconImage(icon)}">
+            <span>${name}</span>
+        `;
+    },
+    onPlayerSelect: function(e, target) {
+        const player = playerMap.get(target).refresh();
 
         // Spawn em to map if we want em
         if (!player.spawned) {
-            this.trigger('map:player:spawn', player);
+            player.spawned = true;
             return;
         }
 
@@ -36,17 +34,17 @@ export default Component.define({
         this.trigger('map:player:focus', player);
     },
     render: async function() {
-        this.state.get('players').map((player, index) => {
-            const playerCard = playerCardTpl.render(player.name, player.icon);
+        this.players.map((player, index) => {
+
+            const playerCard = this.tpl(player.name, player.icon);
             playerMap.set(playerCard, player);
 
+            // Set default attrs
             playerCard.setAttribute('title', player.name);
-
             if (player.spawned) playerCard.classList.add('spawned');
-
             this.el.appendChild(playerCard);
 
-            // Listen for name changes
+            // Listen for changes
             player.on(`update:name`, (newName) => {
                 playerCard.querySelector('span').innerText = newName;
                 playerCard.setAttribute('title', newName);

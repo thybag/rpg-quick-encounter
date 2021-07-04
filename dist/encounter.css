@@ -506,6 +506,15 @@ input[type='submit']:hover {
     padding: .5rem .8rem;
     border: solid 2px #24c37e;
 }
+
+.leaflet-marker-draggable {
+    transition: transform 0.3s ease 0s;
+}
+.leaflet-marker-draggable.prevent-animation {
+    transition: none;
+}
+
+
 /* required styles */
 
 .leaflet-pane,

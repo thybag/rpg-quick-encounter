@@ -39,22 +39,25 @@ export default Component.define({
     events: {
         'map:click': 'fogClear',
         'map:contextmenu': 'fogAdd',
-        'map:player:spawn': 'spawnPlayer',
+        //'map:player:spawn': 'spawnPlayer',
         'map:player:focus': 'focusPlayer',
-        'map:spawn': 'spawnNpc',
+
+        'create:players.*': 'spawnPlayer',
+        'create:spawns.*': 'spawnNpc',
+
         'update:fog.enabled': 'fogToggled',
         'update:fog.opacity': 'fogOpacityChanged',
     },
     // Map actions
     spawnPlayer: function(player) {
+        console.log("spawn player called", player);
         const marker = this.generateMarker(player.name, player.icon, player);
         playerToIconMap[player.id] = marker;
-        player.spawned = true;
     },
     spawnNpc: function(npc) {
+        console.log("spawn npc called", npc);
         const marker = this.generateMarker(npc.name, npc.icon, npc);
         npcToIconMap[npc.id] = marker;
-        npc.spawned = true;
     },
     generateMarker: function(name, img, ref) {
         return Character.make({ref: ref, map: this.map});
@@ -100,13 +103,11 @@ export default Component.define({
 
         // Boot players
         for (const player of Object.values(this.options.get('players'))) {
-            if (player.spawned) {
-                this.trigger('map:player:spawn', player);
-            }
+            this.spawnPlayer(player);
         }
         // Boot spawns
         for (const spawn of Object.values(this.options.get('spawns'))) {
-            if (spawn.spawned) this.trigger('map:spawn', spawn);
+            this.spawnNpc(spawn);
         }
     },
 });

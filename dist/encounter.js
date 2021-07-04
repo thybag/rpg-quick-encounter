@@ -90,7 +90,7 @@
     const Component = function() {
         // Component
         const ComponentImplementation = function(config) {
-        // Copy methods to Object
+            // Copy methods to Object
             if (config) {
                 Object.keys(config).forEach(function(key) {
                     if (key != 'events') this[key] = config[key];
@@ -119,7 +119,7 @@
             }
         };
         ComponentImplementation.prototype.on = function(key, method) {
-        // Add a listener
+            // Add a listener
             const split = key.indexOf(' ');
             let event = (split===-1) ? key : key.substr(0, split);
             const target = (split===-1) ? '' : key.substr(split+1);
@@ -165,14 +165,14 @@
             return this;
         };
         ComponentImplementation.prototype.off = function(key) {
-        // Remove a listener
+            // Remove a listener
             for (const [event, handler] of this._events[key] || []) {
                 this.el.removeEventListener(event, handler);
             }
             delete this._events[key];
         };
         ComponentImplementation.prototype.connect = function(events) {
-        // Create events on new obj, so components don't share
+            // Create events on new obj, so components don't share
             this._events = [];
             if (!events || typeof events !== 'object') return;
             // connected all events
@@ -181,10 +181,14 @@
             }
         };
         ComponentImplementation.prototype.disconnect = function() {
-        // Remove all events
+            // Remove all events
             for (const [key] of Object.entries(this._events)) {
                 this.off(key);
             }
+        };
+        ComponentImplementation.prototype.destroy = function() {
+            this.disconnect();
+            if(this.el) this.el.remove();
         };
         ComponentImplementation.prototype.listenTo = function(model) {
             if (typeof model.addListener !== 'function') {
@@ -277,11 +281,13 @@
                                 return parent.get(`${context}.${key}`);
                             };
                         }
+
                         if (prop == 'set') {
                             return function(key, value) {
                                 return parent.set(`${context}.${key}`, value);
                             };
                         }
+
                         if (prop == 'on') {
                             return function(event, callback) {
                                 let listener = `${event}:${context}`;
@@ -295,13 +301,20 @@
                                 return parent.on(listener, callback);
                             };
                         }
+
+                        // Get latest version of this object.
+                        // Can happen if old object gets disconnected
                         if (prop == 'refresh') {
                             return () => parent.get(context);
                         }
 
+                        // Get datapath to this object
+                        if (prop == 'context') {
+                            return () => context;
+                        }
                     }
 
-                    // Normal functionalty - ie. actuallt getting values
+                    // Normal functionalty - ie. actually getting values
                     let result = Reflect.get(obj, prop);
 
                     if (parent.isObject(result)) {
@@ -557,20 +570,28 @@
             }
         }
 
+        // Workout wildcard datapath
+        const wildcardNamespace = namespace.substr(0, namespace.lastIndexOf('.')+1) + '*';
+        // reload updated from store so we return proxy instance of objects
+        const updatedData = (typeof updated === 'object') ? this.get(namespace) : updated;
+
         // Fire change type events
         switch (returnType) {
-            case 'CREATE':
-                this.trigger('create:'+namespace, updated);
-                break;
-            case 'UPDATE':
-                this.trigger('update:'+namespace, updated, original);
-                break;
-            case 'REMOVE':
-                this.trigger('remove:'+namespace, original);
-                break;
-            case 'NONE':
-                this.trigger('unchanged:'+namespace, original);
-                break;
+        case 'CREATE':
+            this.trigger('create:'+wildcardNamespace, updatedData);
+            this.trigger('create:'+namespace, updatedData);
+            break;
+        case 'UPDATE':
+            this.trigger('update:'+wildcardNamespace, updatedData, original);
+            this.trigger('update:'+namespace, updatedData, original);
+            break;
+        case 'REMOVE':
+            this.trigger('remove:'+wildcardNamespace, original);
+            this.trigger('remove:'+namespace, original);
+            break;
+        case 'NONE':
+            this.trigger('unchanged:'+namespace, updatedData);
+            break;
         }
 
         // Fire general change events, both namspaced and global.
@@ -583,7 +604,7 @@
     // Apply change to original, so new changes can be detected
     Model.prototype.commitChanges = function(keys, original, updated) {
         const next = keys.shift();
-        // Insert either at most accurate point, or where original deoes not yet exist
+        // Insert either at most accurate point, or where original does not yet exist
         if (keys.length == 0 || !original[next]) {
             original[next] = this.copy(updated[next]);
             return;
@@ -17899,9 +17920,7 @@
         },
         // Remove modal
         close: function() {
-            this.disconnect();
-            this.el.remove();
-            this.render();
+            this.destroy();
         },
         // Open image picker
         openPickList: function(e, target) {
@@ -17925,6 +17944,8 @@
         );
     }
 
+    let globalZIndexOffset = 0;
+
     var Character = Component$1.define({
         marker: null,
         ref: null,
@@ -17933,6 +17954,7 @@
         events: {
             'marker:click': 'characterClick',
             'marker:dblclick': 'characterDblClick',
+            'marker:dragstart': 'characterDragStart',
             'marker:dragend': 'characterDragend',
             'marker:contextmenu': 'characterRemove',
             'data:change': 'render',
@@ -17942,22 +17964,24 @@
             this.ref = ref;
             this.map = map;
 
+            // Set initial position if not already defined.
+            if (!this.ref.x || !this.ref.y) {
+                this.ref.x = map.getCenter().lat;
+                this.ref.y = map.getCenter().lng;
+            }
+
             this.marker = makeMarker(
-                (ref.x) ? leafletSrc.latLng(ref.x, ref.y) : map.getCenter(),
+                leafletSrc.latLng(this.ref.x, this.ref.y),
             );
-            // Add to map
-            this.marker.addTo(this.map);
 
             // Register events
             this.marker.on('click', (e) => this.trigger('marker:click', e));
             this.marker.on('dblclick', (e) => this.trigger('marker:dblclick', e));
+            this.marker.on('dragstart', (e) => this.trigger('marker:dragstart', e));
             this.marker.on('dragend', (e) => this.trigger('marker:dragend', e));
             this.marker.on('contextmenu', (e) => this.trigger('marker:contextmenu', e));
 
-            this.ref.on('update:name', (e) => this.trigger('data:change', e));
-            this.ref.on('update:icon', (e) => this.trigger('data:change', e));
-            this.ref.on('update:x', (e) => this.trigger('data:change', e));
-            this.ref.on('update:y', (e) => this.trigger('data:change', e));
+            this.ref.on('update', (e) => this.trigger('data:change', e));
 
             // Make icon
             this.render();
@@ -17973,15 +17997,25 @@
         },
         characterClick: function(event) {
             event.preventDefault;
+
+            // Bring character to the front
+            globalZIndexOffset++;
+            this.marker.setZIndexOffset(globalZIndexOffset*1000);
         },
         characterDblClick: function(event) {
             event.preventDefault;
             // Going old school for now
-            SpawnModal.make({target: this.ref});
+            SpawnModal.make({target: this.ref.refresh()});
+        },
+        characterDragStart: function(event) {
+            // Disable transition effect when we're dragging
+            event.target._icon.classList.add('prevent-animation');
         },
         characterDragend: function(event) {
             const latLng = event.target.getLatLng();
+            event.target._icon.classList.remove('prevent-animation');
             // Sync
+            this.ref = this.ref.refresh();
             this.ref.x = latLng.lat;
             this.ref.y = latLng.lng;
         },
@@ -17989,13 +18023,17 @@
             event.preventDefault;
             if (confirm('Are you sure you want to remove this character?')) {
                 this.ref.spawned = false;
-                this.marker.remove();
             }
         },
         render: function() {
             this.ref = this.ref.refresh();
+
             // Sync spawned?
-            // remove / add to map?
+            if (!this.ref.spawned) {
+                this.marker.remove();
+            } else {
+                this.marker.addTo(this.map);
+            }
 
             // Sync position
             this.marker.setLatLng([this.ref.x, this.ref.y]);
@@ -18047,22 +18085,25 @@
         events: {
             'map:click': 'fogClear',
             'map:contextmenu': 'fogAdd',
-            'map:player:spawn': 'spawnPlayer',
+            //'map:player:spawn': 'spawnPlayer',
             'map:player:focus': 'focusPlayer',
-            'map:spawn': 'spawnNpc',
+
+            'create:players.*': 'spawnPlayer',
+            'create:spawns.*': 'spawnNpc',
+
             'update:fog.enabled': 'fogToggled',
             'update:fog.opacity': 'fogOpacityChanged',
         },
         // Map actions
         spawnPlayer: function(player) {
+            console.log("spawn player called", player);
             const marker = this.generateMarker(player.name, player.icon, player);
             playerToIconMap[player.id] = marker;
-            player.spawned = true;
         },
         spawnNpc: function(npc) {
+            console.log("spawn npc called", npc);
             const marker = this.generateMarker(npc.name, npc.icon, npc);
             npcToIconMap[npc.id] = marker;
-            npc.spawned = true;
         },
         generateMarker: function(name, img, ref) {
             return Character.make({ref: ref, map: this.map});
@@ -18108,13 +18149,11 @@
 
             // Boot players
             for (const player of Object.values(this.options.get('players'))) {
-                if (player.spawned) {
-                    this.trigger('map:player:spawn', player);
-                }
+                this.spawnPlayer(player);
             }
             // Boot spawns
             for (const spawn of Object.values(this.options.get('spawns'))) {
-                if (spawn.spawned) this.trigger('map:spawn', spawn);
+                this.spawnNpc(spawn);
             }
         },
     });
@@ -18181,30 +18220,29 @@
 
     const playerMap = new WeakMap();
 
-    const playerCardTpl = new Template({
-        template: (name, icon) => {
-            return `
-        <img src="${getIconImage(icon)}">
-        <span>${name}</span>
-    `;
-        },
-    });
-
     var Players = Component$1.define({
         initialize: function(config) {
+            // Config player bar.
             this.el.id = 'player-bar';
-            this.state = config.state;
+
+            this.players = config.players;
             this.render();
         },
         events: {
-            'click div': 'playerSelect',
+            'click div': 'onPlayerSelect',
         },
-        playerSelect: function(e, target) {
-            const player = playerMap.get(target);
+        template: (name, icon) => {
+            return `
+            <img src="${getIconImage(icon)}">
+            <span>${name}</span>
+        `;
+        },
+        onPlayerSelect: function(e, target) {
+            const player = playerMap.get(target).refresh();
 
             // Spawn em to map if we want em
             if (!player.spawned) {
-                this.trigger('map:player:spawn', player);
+                player.spawned = true;
                 return;
             }
 
@@ -18212,17 +18250,17 @@
             this.trigger('map:player:focus', player);
         },
         render: async function() {
-            this.state.get('players').map((player, index) => {
-                const playerCard = playerCardTpl.render(player.name, player.icon);
+            this.players.map((player, index) => {
+
+                const playerCard = this.tpl(player.name, player.icon);
                 playerMap.set(playerCard, player);
 
+                // Set default attrs
                 playerCard.setAttribute('title', player.name);
-
                 if (player.spawned) playerCard.classList.add('spawned');
-
                 this.el.appendChild(playerCard);
 
-                // Listen for name changes
+                // Listen for changes
                 player.on(`update:name`, (newName) => {
                     playerCard.querySelector('span').innerText = newName;
                     playerCard.setAttribute('title', newName);
@@ -18292,13 +18330,13 @@
         },
         // Actions
         toggleFog: function(e, target) {
-            this.fogProps.enabled = target.checked;
+            this.fogProps.refresh().enabled = target.checked;
         },
         changeOpacity: function(e, target) {
-            this.fogProps.opacity = target.value;
+            this.fogProps.refresh().opacity = target.value;
         },
         changeClearSize: function(e, target) {
-            this.fogProps.clearSize = target.value;
+            this.fogProps.refresh().clearSize = target.value;
         },
         toggle: function() {
             this.prop.visible = !this.prop.visible;
@@ -18559,7 +18597,7 @@
 
             // Boot Core Components
             const map = EncounterMap.make({el: mapEl, state: mapState});
-            const players = Players.make({el: playerEl, state: mapState});
+            const players = Players.make({el: playerEl, players: mapState.get('players')});
             const controls = Controls.make({el: controlEl, state: mapState});
 
             /* to refactor */
@@ -18571,15 +18609,11 @@
             });
 
             controls.on('map:spawn', function(v) {
-                const spawn = {
+                mapState.data.spawns.push({
                     ...v,
                     id: mapState.data.spawns.length,
-                    x: 0,
-                    y: 0,
                     spawned: true,
-                };
-                mapState.data.spawns.push(spawn);
-                map.trigger('map:spawn', mapState.data.spawns[mapState.data.spawns.length - 1]);
+                });
             });
 
             // Test code to see if we can sync data between maps
@@ -18590,13 +18624,13 @@
                     mapState.set('fog', newData.fog);
                     mapState.set('players', newData.players);
 
-                    console.log("Sync changes");
+                    console.log('Sync changes');
                 }
             });
-            
+
             // Debugging
-            mapState.on('change', function(a,b,c,d){
-                if(a != 'NONE') console.log("CHANGE",a,b,c,d);
+            mapState.on('change', function(a, b, c, d) {
+                if (a != 'NONE') console.log('CHANGE', a, b, c, d);
             });
 
             // Save local storage
