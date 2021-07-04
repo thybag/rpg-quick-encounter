@@ -17552,19 +17552,39 @@
         };
 
         this.saveMap = function(key, data) {
-            return this._set(mapPrefix + key, data);
+            const clean = JSON.parse(JSON.stringify(data));
+            // Inject last updated.
+            clean['data:updated'] = new Date();
+
+            return this._set(mapPrefix + key, clean);
         };
 
         // Get all map paths in dataPrefix
         this.getMaps = function() {
-            const len = (dataPrefix + mapPrefix).length;
             // Find matching maps, the strip of prefix based on
             // length of len
-            return Object.keys(storage).filter((x) => {
-                return x.startsWith(dataPrefix + mapPrefix);
-            }).map((x) => {
-                return x.substr(len);
+            const maps = Object.entries(storage).filter(
+                // Include only relevent maps
+                ([key, data]) => {
+                    return key.startsWith(dataPrefix + mapPrefix);
+                }
+            ).map(
+                // Parse in to real data
+                ([key, data]) => {
+                    return JSON.parse(data);
+                }
+            );
+
+            // Most recently used first
+            maps.sort(function(b, a) {
+                // Legacy issue for now is a lot of older maps won't have the updated date.
+                // For these assume it was 2020.
+                let d1 = (a['data:updated']) ? new Date(a['data:updated']) : new Date('2020-01-01');
+                let d2 = (b['data:updated']) ? new Date(b['data:updated']) : new Date('2020-01-01');
+                return d1-d2;
             });
+
+            return maps;
         };
 
         // Get all icons
@@ -19071,7 +19091,6 @@
         playerTarget: null,
         initialize: function(config) {
             this.el = wizardPlayersTpl.render();
-            this.picker = null;
 
             const icons = getRandomPlayerIconList();
             this.playerTarget = this.el.querySelector('div');
@@ -19100,8 +19119,7 @@
             this.playerTarget.appendChild(nPlayer);
         },
         openPickList: function(e, target) {
-            if (!this.picker) this.picker = ImagePicker.make();
-            this.picker.open(target);
+            ImagePicker.make({target});
         },
         toUrlString: function() {
             const parts = [];
@@ -19128,7 +19146,17 @@
       <h2>Your existing saves</h2>
       <main>
           ${saves.map((map) => {
-        return `<a href="?map=${map}"><img src="${map}" loading="lazy" /></a>`;
+            return `<a href="?map=${map.map}">
+                <img src="${map.map}" loading="lazy" />
+                <div>
+                    Map: <span>${map.map}</span> <br/>
+                    Players: ${map.players.length}, Mobs: ${map.spawns.length} <br/>
+                    Last played: ${map['data:updated'] ? new Date(map['data:updated']).toLocaleString() :'-'}
+                </div>
+                <div class='play'>
+                    <button>Open</button>
+                </div>
+            </a>`;
     }).join('')}
       </main>
     `;
@@ -19224,9 +19252,7 @@
 
 
             if (saves.length !== 0) {
-                const height = Math.ceil(saves.length/5) * 156;
                 const saveZone = savesTlp.render(saves);
-                saveZone.style.height = `${height}px`;
                 saveZone.className = 'save-zone';
                 this.el.appendChild(saveZone);
             }

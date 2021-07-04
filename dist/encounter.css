@@ -293,7 +293,7 @@ right: 1rem;
     top:0;
     left:0;
     right:0;
-    height: calc(100vh - 40px);
+    height: 100vh;
     overflow: auto;
 }
   .wizard, .save-zone {
@@ -422,19 +422,42 @@ right: 1rem;
 
     }   
 
-    .save-zone main {
-      display: flex;
-      flex-wrap: wrap;
-    }
-    .save-zone a {
-      flex:1;
-      flex-basis: 16%;
-    }
-    .save-zone a img {
-      width:100%;
-      object-fit: cover;
-      height:152px;
-    }
+.save-zone main {
+
+}
+.save-zone a {
+    display: flex;
+    padding: 1rem 2rem;
+    border:  solid 1px #efefef;
+    text-decoration: none;
+}
+.save-zone a:hover {
+    background: #fafafa;
+}
+.save-zone a img {
+  width:80px;
+  min-width: 80px;
+  height:80px;
+  border-radius: 10rem;
+}
+.save-zone a div {
+    margin-left: 2rem;
+    color: #333;
+}
+.save-zone a div.play {
+    display: flex;
+    margin-left: auto;
+    align-items: center;
+}
+.save-zone a div span{
+    text-overflow: ellipsis;
+    display: inline-block;
+    overflow: hidden;
+    white-space: nowrap;
+    width: 400px;
+    vertical-align: bottom;
+}
+
 
 
 

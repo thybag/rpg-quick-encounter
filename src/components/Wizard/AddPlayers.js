@@ -38,7 +38,6 @@ export default Component.define({
     playerTarget: null,
     initialize: function(config) {
         this.el = wizardPlayersTpl.render();
-        this.picker = null;
 
         const icons = getRandomPlayerIconList();
         this.playerTarget = this.el.querySelector('div');
@@ -67,8 +66,7 @@ export default Component.define({
         this.playerTarget.appendChild(nPlayer);
     },
     openPickList: function(e, target) {
-        if (!this.picker) this.picker = ImagePicker.make();
-        this.picker.open(target);
+        ImagePicker.make({target});
     },
     toUrlString: function() {
         const parts = [];

@@ -14,7 +14,17 @@ const savesTlp = new Template({
       <h2>Your existing saves</h2>
       <main>
           ${saves.map((map) => {
-        return `<a href="?map=${map}"><img src="${map}" loading="lazy" /></a>`;
+            return `<a href="?map=${map.map}">
+                <img src="${map.map}" loading="lazy" />
+                <div>
+                    Map: <span>${map.map}</span> <br/>
+                    Players: ${map.players.length}, Mobs: ${map.spawns.length} <br/>
+                    Last played: ${map['data:updated'] ? new Date(map['data:updated']).toLocaleString() :'-'}
+                </div>
+                <div class='play'>
+                    <button>Open</button>
+                </div>
+            </a>`;
     }).join('')}
       </main>
     `;
@@ -110,9 +120,7 @@ export default Component.define({
 
 
         if (saves.length !== 0) {
-            const height = Math.ceil(saves.length/5) * 156;
             const saveZone = savesTlp.render(saves);
-            saveZone.style.height = `${height}px`;
             saveZone.className = 'save-zone';
             this.el.appendChild(saveZone);
         }
