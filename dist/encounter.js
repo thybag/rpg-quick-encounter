@@ -188,7 +188,7 @@
         };
         ComponentImplementation.prototype.destroy = function() {
             this.disconnect();
-            if(this.el) this.el.remove();
+            if (this.el) this.el.remove();
         };
         ComponentImplementation.prototype.listenTo = function(model) {
             if (typeof model.addListener !== 'function') {
