@@ -17465,6 +17465,11 @@
             clickable: false,
         },
         initialize: function(bounds, options) {
+            // Offset bounds so fog boundry isn't in view
+            bounds._northEast.lat +=300;
+            bounds._northEast.lng +=300;
+            bounds._southWest.lat -=300;
+            bounds._southWest.lng -=300;
             leafletSrc.Polygon.prototype.initialize.call(this, [this._boundsToLatLngs(bounds)], options);
         },
         initFog: function(mask) {
@@ -17561,26 +17566,25 @@
 
         // Get all map paths in dataPrefix
         this.getMaps = function() {
-            // Find matching maps, the strip of prefix based on
-            // length of len
+            // Find matching maps
             const maps = Object.entries(storage).filter(
                 // Include only relevent maps
                 ([key, data]) => {
                     return key.startsWith(dataPrefix + mapPrefix);
-                }
+                },
             ).map(
                 // Parse in to real data
                 ([key, data]) => {
                     return JSON.parse(data);
-                }
+                },
             );
 
             // Most recently used first
             maps.sort(function(b, a) {
                 // Legacy issue for now is a lot of older maps won't have the updated date.
                 // For these assume it was 2020.
-                let d1 = (a['data:updated']) ? new Date(a['data:updated']) : new Date('2020-01-01');
-                let d2 = (b['data:updated']) ? new Date(b['data:updated']) : new Date('2020-01-01');
+                const d1 = (a['data:updated']) ? new Date(a['data:updated']) : new Date('2020-01-01');
+                const d2 = (b['data:updated']) ? new Date(b['data:updated']) : new Date('2020-01-01');
                 return d1-d2;
             });
 
@@ -19146,7 +19150,7 @@
       <h2>Your existing saves</h2>
       <main>
           ${saves.map((map) => {
-            return `<a href="?map=${map.map}">
+        return `<a href="?map=${map.map}">
                 <img src="${map.map}" loading="lazy" />
                 <div>
                     Map: <span>${map.map}</span> <br/>

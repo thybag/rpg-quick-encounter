@@ -10,6 +10,11 @@ L.Fog = L.Rectangle.extend({
         clickable: false,
     },
     initialize: function(bounds, options) {
+        // Offset bounds so fog boundry isn't in view
+        bounds._northEast.lat +=300;
+        bounds._northEast.lng +=300;
+        bounds._southWest.lat -=300;
+        bounds._southWest.lng -=300;
         L.Polygon.prototype.initialize.call(this, [this._boundsToLatLngs(bounds)], options);
     },
     initFog: function(mask) {
