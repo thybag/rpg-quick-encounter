@@ -48,10 +48,7 @@ export default Component.define({
         this.marker.on('dragend', (e) => this.trigger('marker:dragend', e));
         this.marker.on('contextmenu', (e) => this.trigger('marker:contextmenu', e));
 
-        this.ref.on('update:name', (e) => this.trigger('data:change', e));
-        this.ref.on('update:icon', (e) => this.trigger('data:change', e));
-        this.ref.on('update:x', (e) => this.trigger('data:change', e));
-        this.ref.on('update:y', (e) => this.trigger('data:change', e));
+        this.ref.on('update', (e) => this.trigger('data:change', e));
 
         // Make icon
         this.render();
