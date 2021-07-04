@@ -49,11 +49,9 @@ function isBefore(el1, el2) {
  * [description]
  * @param  {[type]} elements [description]
  */
-export default function(elements) {
-    Array.from(elements).map((el) => {
-        el.addEventListener('dragend', dragEnd);
-        el.addEventListener('dragstart', dragStart);
-        el.addEventListener('dragover', dragOver);
-        el.draggable = true;
-    });
+export default function(el) {
+    el.addEventListener('dragend', dragEnd);
+    el.addEventListener('dragstart', dragStart);
+    el.addEventListener('dragover', dragOver);
+    el.draggable = true;
 }

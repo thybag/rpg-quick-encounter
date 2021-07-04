@@ -220,7 +220,7 @@
         // Define base component
         this.define = function(config) {
             const definedComponent = new Component;
-            definedComponent.config = config;
+            definedComponent.config = {...this.config, ...config};
             return definedComponent;
         };
     };
@@ -17605,14 +17605,14 @@
     const monsterIcons = 33;
     let iconPath = 'assets/';
 
-    const iconList$2 = []; const monsterList = [];
+    const iconList$3 = []; const monsterList = [];
 
-    for (let i = 1; i <= playerIcons; i++) iconList$2.push('p:' + i);
+    for (let i = 1; i <= playerIcons; i++) iconList$3.push('p:' + i);
     for (let i = 1; i <= monsterIcons; i++) monsterList.push('m:' + i);
 
     // Get all player icons
     const getPlayerIcons = function() {
-        return iconList$2;
+        return iconList$3;
     };
     // Get all monster icons
     const getMonsterIcons = function() {
@@ -17626,7 +17626,7 @@
 
     // Get random player icon
     const getRandomPlayerIcon = function() {
-        return iconList$2[Math.floor((Math.random() * iconList$2.length))];
+        return iconList$3[Math.floor((Math.random() * iconList$3.length))];
     };
 
     // Get random monster icon
@@ -17637,7 +17637,7 @@
     // Get player icons as unique list
     const getRandomPlayerIconList = function() {
         // No point using a smarter algo for 8 elements.
-        return iconList$2.sort(() => Math.random() - 0.5);
+        return iconList$3.sort(() => Math.random() - 0.5);
     };
 
     // Change icon path if being used via another app
@@ -17710,7 +17710,7 @@
         };
     }
 
-    const iconList$1 = new Template({
+    const iconList$2 = new Template({
         template: () => {
             let NPCList = ''; let MonsterList = ''; let CustomList = '';
 
@@ -17742,7 +17742,7 @@
      * @param  {[type]} iconImg [description]
      * @return {[type]}         [description]
      */
-    async function loadFile$1(iconImg) {
+    async function loadFile$2(iconImg) {
         const imgData = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(iconImg);
@@ -17759,8 +17759,8 @@
      * @param  {[type]} iconImg [description]
      * @return {[type]}         [description]
      */
-    async function imageToIcon$1(iconImg) {
-        const img = await loadFile$1(iconImg);
+    async function imageToIcon$2(iconImg) {
+        const img = await loadFile$2(iconImg);
 
         // Local storage is small so we wanna scale it down before we save
         const canvas = document.createElement('canvas');
@@ -17774,7 +17774,7 @@
         return canvas.toDataURL('image/webp', 0.8);
     }
 
-    var ImagePicker$1 = Component$1.define({
+    var ImagePicker$2 = Component$1.define({
         initialize: function(options) {
             this.el = this.tpl();
             this.parent = options.target;
@@ -17837,7 +17837,7 @@
                 // Only deal with images
                 if (!file.type.match('image.*')) continue;
 
-                const newIcon = await imageToIcon$1(file);
+                const newIcon = await imageToIcon$2(file);
                 localData.saveIcon(newIcon);
             }
             this.render();
@@ -17856,33 +17856,21 @@
             }
         },
         render: async function() {
-            this.el.querySelector('main').innerHTML = iconList$1.render().innerHTML;
+            this.el.querySelector('main').innerHTML = iconList$2.render().innerHTML;
         },
     });
 
-    var SpawnModal = Component$1.define({
-        // Data
-        target: null,
-        // Setup
-        initialize: function(options) {
-            this.target = options.target;
-
-            // Render base template
-            this.el = this.tpl(this.target.name, this.target.icon);
-
-            // Create self on the global level as needed.
-            document.body.appendChild(this.el);
-        },
+    var BaseMobModal = Component$1.define({
         // Templates
         className: 'modal',
-        template: (name, icon) => {
+        template: (title, name, icon) => {
             return `
             <div class='spawn-controls'>
-                <h2>Update</h2>
+                <h2>${title}</h2>
                 <img src="${getIconImage(icon)}" data-id="${icon}">
                 <div>
                     <label>Name</label>
-                    <input type="text" value="${name}">
+                    <input type="text" value="${name}" placeholder="Player name...">
                     <input type='submit' value="Save">
                 </div>
             </div>
@@ -17901,19 +17889,35 @@
                 this.save();
             }
         },
-        // Save data to target
-        save: function(e, target) {
-            this.target.name = this.el.querySelector('input[type=text]').value;
-            this.target.icon = this.el.querySelector('img').dataset.id;
-            this.close();
-        },
         // Remove modal
         close: function() {
             this.destroy();
         },
         // Open image picker
         openPickList: function(e, target) {
-            ImagePicker$1.make({target});
+            ImagePicker$2.make({target});
+        },
+    });
+
+    var EditMobModal = BaseMobModal.define({
+        initialize: function(options) {
+            this.target = options.target;
+
+            // Render base template
+            this.el = this.tpl(
+                "Update Mob",
+                this.target.name, 
+                this.target.icon
+            );
+
+            // Create self on the global level as needed.
+            document.body.appendChild(this.el);
+        },
+        // Save data to target
+        save: function(e, target) {
+            this.target.name = this.el.querySelector('input[type=text]').value;
+            this.target.icon = this.el.querySelector('img').dataset.id;
+            this.close();
         },
     });
 
@@ -17992,8 +17996,7 @@
         },
         characterDblClick: function(event) {
             event.preventDefault;
-            // Going old school for now
-            SpawnModal.make({target: this.ref.refresh()});
+            EditMobModal.make({target: this.ref.refresh()});
         },
         characterDragStart: function(event) {
             // Disable transition effect when we're dragging
@@ -18195,14 +18198,42 @@
      * [description]
      * @param  {[type]} elements [description]
      */
-    function dragSort(elements) {
-        Array.from(elements).map((el) => {
-            el.addEventListener('dragend', dragEnd);
-            el.addEventListener('dragstart', dragStart);
-            el.addEventListener('dragover', dragOver);
-            el.draggable = true;
-        });
+    function dragSort(el) {
+        el.addEventListener('dragend', dragEnd);
+        el.addEventListener('dragstart', dragStart);
+        el.addEventListener('dragover', dragOver);
+        el.draggable = true;
     }
+
+    var NewPlayerModal = BaseMobModal.define({
+        // Setup
+        initialize: function(options) {
+            console.log(options);
+            this.players = options.players;
+
+            // Render base template
+            const defaultIcon = getRandomPlayerIcon();
+            this.el = this.tpl(
+                "Add Player",
+                "",
+                defaultIcon
+            );
+
+            // Create self on the global level as needed.
+            document.body.appendChild(this.el);
+        },
+        // Save data to target
+        save: function(e, target) {
+            this.players = this.players.refresh();
+            this.players.push({
+                name: this.el.querySelector('input[type=text]').value,
+                icon: this.el.querySelector('img').dataset.id,
+                spawned: true
+            });
+
+            this.close();
+        },
+    });
 
     const playerMap = new WeakMap();
 
@@ -18212,16 +18243,61 @@
             this.el.id = 'player-bar';
 
             this.players = config.players;
+            this.players.on('create:*', (e) => this.trigger('player:added', e));
+
             this.render();
         },
         events: {
             'click div': 'onPlayerSelect',
+            'click div.newPlayer span': 'newPlayer',
+            'player:added': 'makePlayerCard'
         },
         template: (name, icon) => {
             return `
             <img src="${getIconImage(icon)}">
             <span>${name}</span>
         `;
+        },
+        newPlayer: function() {
+            NewPlayerModal.make({players: this.players});
+        },
+        makePlayerCard: function(player){
+            const playerCard = this.tpl(player.name, player.icon);
+            playerMap.set(playerCard, player);
+
+            // Set default attrs
+            playerCard.setAttribute('title', player.name);
+            if (player.spawned) playerCard.classList.add('spawned');
+
+            // Insert before the "add new" if needed
+            let addCard = this.el.querySelector('.newPlayer');
+            if (addCard) {
+                 this.el.insertBefore(playerCard, addCard);
+            } else {
+                 this.el.appendChild(playerCard);
+            }
+           
+            // Makes sortable
+            dragSort(playerCard);
+
+            // Listen for changes
+            player.on(`update:name`, (newName) => {
+                playerCard.querySelector('span').innerText = newName;
+                playerCard.setAttribute('title', newName);
+            });
+            player.on(`update:icon`, (newIcon) => {
+                playerCard.querySelector('img').src = getIconImage(newIcon);
+            });
+
+            // Listen for spawn changes
+            player.on(`update:spawned`, (spawned) => {
+                if (spawned) {
+                    playerCard.classList.add('spawned');
+                } else {
+                    playerCard.classList.remove('spawned');
+                }
+            });
+            
         },
         onPlayerSelect: function(e, target) {
             const player = playerMap.get(target).refresh();
@@ -18236,36 +18312,14 @@
             this.trigger('map:player:focus', player);
         },
         render: async function() {
-            this.players.map((player, index) => {
-                const playerCard = this.tpl(player.name, player.icon);
-                playerMap.set(playerCard, player);
-
-                // Set default attrs
-                playerCard.setAttribute('title', player.name);
-                if (player.spawned) playerCard.classList.add('spawned');
-                this.el.appendChild(playerCard);
-
-                // Listen for changes
-                player.on(`update:name`, (newName) => {
-                    playerCard.querySelector('span').innerText = newName;
-                    playerCard.setAttribute('title', newName);
-                });
-                player.on(`update:icon`, (newIcon) => {
-                    playerCard.querySelector('img').src = getIconImage(newIcon);
-                });
-
-                // Listen for spawn changes
-                player.on(`update:spawned`, (spawned) => {
-                    if (spawned) {
-                        playerCard.classList.add('spawned');
-                    } else {
-                        playerCard.classList.remove('spawned');
-                    }
-                });
+            this.players.map((player) => {
+                this.makePlayerCard(player);
             });
-
-            // Make list sortable
-            dragSort(this.el.children);
+            
+            let newEl = document.createElement('div');
+            newEl.className = 'newPlayer';
+            newEl.innerHTML ='<span>+</span><span>Add</span>';
+            this.el.appendChild(newEl);
         },
     });
 
@@ -18344,6 +18398,156 @@
             } else {
                 this.el.style.display = 'none';
             }
+        },
+    });
+
+    const iconList$1 = new Template({
+        template: () => {
+            let NPCList = ''; let MonsterList = ''; let CustomList = '';
+
+            getPlayerIcons().forEach((i) => {
+                NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+            });
+            getMonsterIcons().forEach((i) => {
+                MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+            });
+            getCustomIcons().forEach((i) => {
+                CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+            });
+
+            return `
+      <div>Your images</div>
+          <span>+</span> 
+          ${CustomList}
+      <div>NPCs/Players</div>
+          ${NPCList}
+      <div>Monsters</div>
+          ${MonsterList}
+      `;
+        },
+    });
+
+    /**
+     * load filedata from upload
+     *
+     * @param  {[type]} iconImg [description]
+     * @return {[type]}         [description]
+     */
+    async function loadFile$1(iconImg) {
+        const imgData = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(iconImg);
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+        });
+
+        return checkImage(imgData);
+    }
+
+    /**
+     * resize and return as final icon image to store
+     *
+     * @param  {[type]} iconImg [description]
+     * @return {[type]}         [description]
+     */
+    async function imageToIcon$1(iconImg) {
+        const img = await loadFile$1(iconImg);
+
+        // Local storage is small so we wanna scale it down before we save
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // draw source image into the off-screen canvas:
+        canvas.width = 70;
+        canvas.height = 70;
+        ctx.drawImage(img, 0, 0, 70, 70);
+
+        return canvas.toDataURL('image/webp', 0.8);
+    }
+
+    var ImagePicker$1 = Component$1.define({
+        initialize: function(options) {
+            this.el = this.tpl();
+            this.parent = options.target;
+
+            this.render();
+            // Add to world
+            document.body.appendChild(this.el);
+        },
+        className: 'modal',
+        template: () => {
+            return `
+            <div class='image-picker'>
+                <h2>Image picker</h2>
+                 <main></main>
+                <footer><button>Cancel</button></footer>
+            </div>
+        `;
+        },
+        events: {
+            'click img': 'select',
+            'click span': 'addIcon',
+            // Close options
+            'click button': 'close',
+            'click .modal': 'close',
+            // Upload options
+            'dragover main': 'uploadEnable',
+            'drop main': 'upload',
+            'dragenter main': 'uploadFocus',
+            'dragleave main': 'uploadBlur',
+        },
+        uploadEnable: function(e) {
+        // Need this to be able to upload.
+            e.preventDefault();
+        },
+        select: function(e, item) {
+            this.parent.src = item.src;
+            this.parent.dataset.id = (item.dataset.id) ? item.dataset.id : item.src;
+
+            this.close();
+        },
+        close: function() {
+            this.destroy();
+        },
+        uploadFocus: function(e) {
+            e.preventDefault();
+            this.el.classList.add('uploadHover');
+        },
+        uploadBlur: function(e) {
+            e.preventDefault();
+            this.el.classList.remove('uploadHover');
+        },
+        upload: async function(e) {
+            e.preventDefault();
+
+            const files = e.dataTransfer.files;
+
+            // Get files that were dragged
+            for (let f = 0; f < files.length; f++) {
+                const file = files[f];
+                // Only deal with images
+                if (!file.type.match('image.*')) continue;
+
+                const newIcon = await imageToIcon$1(file);
+                localData.saveIcon(newIcon);
+            }
+            this.render();
+            this.uploadBlur(e);
+        },
+        addIcon: async function() {
+            const iconPath = prompt('Icon image url');
+            if (iconPath) {
+                try {
+                    await checkImage(iconPath);
+                    localData.saveIcon(iconPath);
+                    this.render();
+                } catch (e) {
+                    alert('failed to load image');
+                }
+            }
+        },
+        render: async function() {
+            this.el.querySelector('main').innerHTML = iconList$1.render().innerHTML;
         },
     });
 

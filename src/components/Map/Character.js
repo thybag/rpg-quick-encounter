@@ -1,8 +1,7 @@
 import L from 'leaflet';
 import Component from 'lumpjs/src/component.js';
 import getIconImage from '../../utils/getIconImage.js';
-
-import SpawnModal from '../Controls/SpawnModal.js';
+import EditMobModal from '../Modals/EditMobModal.js';
 
 /**
  * Make Leaflet Marker
@@ -79,8 +78,7 @@ export default Component.define({
     },
     characterDblClick: function(event) {
         event.preventDefault;
-        // Going old school for now
-        SpawnModal.make({target: this.ref.refresh()});
+        EditMobModal.make({target: this.ref.refresh()});
     },
     characterDragStart: function(event) {
         // Disable transition effect when we're dragging

@@ -68,11 +68,32 @@ input[type='submit']:hover {
     pointer-events: none;
     width:100%;
     filter: grayscale(100%);
+    transition: transform 0.2s;
+}
+#player-bar div:hover img{
+ transform: scale(1.1);
 }
 #player-bar div.spawned img {
    filter: none;
 }
+#player-bar div.newPlayer {
+    opacity: 0;
+    transition: opacity .4s;
+}
+#player-bar:hover div.newPlayer {
+    opacity: 100;
+}
 
+#player-bar div.newPlayer span:first-child {
+   font-size: 2rem;
+   line-height: 45px;
+   height: 50px;
+   border: solid 1px #ddd;
+   margin: 3px;
+}
+#player-bar div.newPlayer span:first-child:hover {
+    background-color: #efefef;
+}
 
 .character-icon {
     position:relative;
