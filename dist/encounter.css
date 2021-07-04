@@ -237,7 +237,7 @@ right: 1rem;
   background: #ffff;
   width: 60vw;
   left: 20vw;
-
+  cursor: default;
   border: solid 3px #000;
   box-shadow: 5px 5px 6px -3px #222;
 }
@@ -468,10 +468,10 @@ right: 1rem;
   pointer-events: none;
 }
 .uploadHover:before {
-    content:"Add icon?";
+    content:"Drop image to add icon";
     position: absolute;
-    left: calc(50% - 80px - .8rem);
-    width: 160px;
+    left: calc(50% - 110px - .8rem);
+    width: 220px;
     top: 15%;
     font-size: 1.2rem;
     border: solid 2px #24c37e;

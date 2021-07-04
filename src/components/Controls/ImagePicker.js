@@ -108,7 +108,7 @@ export default Component.define({
         'dragleave main': 'uploadBlur',
     },
     uploadEnable: function(e) {
-    // Need this to be able to upload.
+        // Need this to be able to upload.
         e.preventDefault();
     },
     select: function(e, item) {
@@ -122,11 +122,11 @@ export default Component.define({
     },
     uploadFocus: function(e) {
         e.preventDefault();
-        this.el.classList.add('uploadHover');
+        this.el.querySelector('.image-picker').classList.add('uploadHover');
     },
     uploadBlur: function(e) {
         e.preventDefault();
-        this.el.classList.remove('uploadHover');
+        this.el.querySelector('.image-picker').classList.remove('uploadHover');
     },
     upload: async function(e) {
         e.preventDefault();
