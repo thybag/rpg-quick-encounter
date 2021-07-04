@@ -15,12 +15,13 @@ export default Component.define({
     template: () => {
         const defaultIcon = getRandomMonsterIcon();
         return `
-          <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
-          <div>
-              <label>Name</label>
-              <input type="text" value="Unknown">
-              <input type='submit' value="Spawn">
-          </div>
+            <h2>Spawn new mob</h2>
+            <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
+            <div>
+                <label>Name</label>
+                <input type="text" value="Unknown">
+                <input type='submit' value="Spawn">
+            </div>
         `;
     },
     prop: {

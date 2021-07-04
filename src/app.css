@@ -115,23 +115,35 @@ input[type='submit']:hover {
 }
 
 /* fog controls */
-.fog-controls {
-	display:flex;
-	position: absolute;
-	width:50vw;
-	font-size:0.9rem;
 
-	right: 2px;
-	bottom: 42px;
+/*
+right: 1rem;
+  bottom: calc(40px + 1rem);
+  z-index: 1020;
+  background: #fff;
+  padding-bottom: .5rem;
+ */
+.fog-controls {
+	position: absolute;
+	width: 400px;
+	font-size:0.9rem;
+	right: 1rem;
+	bottom: calc(40px + 1rem);
     z-index: 1010;
     background: #fff;
 }
-.fog-controls label {
-	flex:2;
-	padding:1rem;
+.fog-controls h2 {
+    background:#24c37e;
+    padding: .5rem;
+    color: #fff;
+    margin: 0;
 }
-.fog-controls label.enable {
-	flex:1;
+.fog-controls div {
+    padding: 2rem;
+    padding-top: 0;
+}
+.fog-controls label {
+	padding:1rem;
 }
 
 .fog-controls label span:first-child {
@@ -139,7 +151,7 @@ input[type='submit']:hover {
 	margin-bottom:.5rem;
 }
 .fog-controls label input[type=range] {
-	width:100%;
+	width:90%;
 	margin:0;
 }
 
@@ -196,16 +208,23 @@ input[type='submit']:hover {
 
 
 /* image picker */
+
 .image-picker {
   position: absolute;
   z-index: 1205;
-  top: calc(50vh - 380px);
+  top: calc(40vh - 380px);
   background: #ffff;
-  width: 50vw;
-  left: 25vw;
+  width: 60vw;
+  left: 20vw;
 
   border: solid 3px #000;
-  box-shadow: 5px 5px 6px -3px #777;
+  box-shadow: 5px 5px 6px -3px #222;
+}
+.image-picker h2 {
+    background:#24c37e;
+    padding: .5rem;
+    color: #fff;
+    margin: 0;
 }
 .image-picker main {
     padding: 1rem;
@@ -245,45 +264,9 @@ input[type='submit']:hover {
   background: #efefef;
 }
 
-
 .image-picker main img {width:55px; cursor:pointer;}
-.spawn-controls img {width:68px; cursor:pointer;}
 
-/*
- Spawn controls
- */
-.spawn-controls {
-  position: absolute;
-  width:500px;
-  max-width:100vw;
-  font-size:0.9rem;
- 
-
-  right: 2px;
-  bottom: 42px;
-  z-index: 1020;
-  background: #fff;
-}
-.spawn-controls input {
-    padding:.5rem;
-    font-size:1.1rem;
-}
-
-.spawn-controls div {
-  display:block;
-  float:left;
-  padding-top:1rem;
-}
-.spawn-controls div label {
-  display:block;
-}
-.spawn-controls img {
-  padding:1rem;
-  display:block;
-  float:left;
-  cursor:pointer;
-}
-
+/** Wizards */
 .wizard-container {
     position:absolute;
     top:0;
@@ -455,6 +438,56 @@ input[type='submit']:hover {
     color:#fff;
 }
 
+/** Spawn controls */
+
+.spawn-controls {
+  position: absolute;
+  width:500px;
+  max-width:100vw;
+  font-size:0.9rem;
+  right: 1rem;
+  bottom: calc(40px + 1rem);
+  z-index: 1020;
+  background: #fff;
+  padding-bottom: .5rem;
+}
+
+.spawn-controls h2 {
+    background:#24c37e;
+    padding: .5rem;
+    color: #fff;
+    margin: 0;
+}
+
+.spawn-controls div {
+  display:block;
+  float:left;
+  padding-top:1rem;
+}
+
+.spawn-controls input {
+    padding:.5rem;
+    font-size:1.1rem;
+}
+.spawn-controls input[type=text] {
+    width: 280px;
+}
+.spawn-controls input[type=submit] {
+    padding: .5rem .8rem;
+    border: solid 2px #24c37e;
+}
+.spawn-controls div label {
+  display:block;
+}
+.spawn-controls img {
+  padding:1rem;
+  display:block;
+  float:left;
+  cursor:pointer;
+  width:68px; cursor:pointer;
+}
+
+
 /** Modal backdrop */
 .modal {
     position: absolute;
@@ -467,26 +500,14 @@ input[type='submit']:hover {
     cursor: pointer;
 }
 
-
 .modal .spawn-controls {
     bottom: auto;
     top: 1rem;
     right: calc(50% - (500px / 2));
 }
 
-.modal .spawn-controls h2 {
-    background:#24c37e;
-    padding: .5rem;
-    color: #fff;
-    margin: 0;
-}
-.modal .spawn-controls input[type=text] {
-    width: 280px;
-}
-.modal .spawn-controls input[type=submit] {
-    padding: .5rem .8rem;
-    border: solid 2px #24c37e;
-}
+
+/* Drag behaviors */
 
 .leaflet-marker-draggable {
     transition: transform 0.3s ease 0s;

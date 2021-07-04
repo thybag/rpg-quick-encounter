@@ -24,6 +24,8 @@ export default Component.define({
     className: 'fog-controls',
     template: (opacity, clearSize) => {
         return `
+            <h2>Fog settings</h2>
+            <div>
             <label>
                 <span>Fog opacity</span>
                 <input type="range" min="1" max="100" value="${opacity}" name='opacity'>
@@ -39,6 +41,7 @@ export default Component.define({
                     <span></span>
               </span>
             </label>
+            </div>
         `;
     },
     prop: {
@@ -68,7 +71,7 @@ export default Component.define({
     },
     render: async function() {
         if (this.prop.visible) {
-            this.el.style.display = 'flex';
+            this.el.style.display = 'block';
         } else {
             this.el.style.display = 'none';
         }

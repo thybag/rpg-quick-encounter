@@ -17787,8 +17787,9 @@
         template: () => {
             return `
             <div class='image-picker'>
-              <main></main>
-              <footer><button>Cancel</button></footer>
+                <h2>Image picker</h2>
+                 <main></main>
+                <footer><button>Cancel</button></footer>
             </div>
         `;
         },
@@ -18292,6 +18293,8 @@
         className: 'fog-controls',
         template: (opacity, clearSize) => {
             return `
+            <h2>Fog settings</h2>
+            <div>
             <label>
                 <span>Fog opacity</span>
                 <input type="range" min="1" max="100" value="${opacity}" name='opacity'>
@@ -18307,6 +18310,7 @@
                     <span></span>
               </span>
             </label>
+            </div>
         `;
         },
         prop: {
@@ -18336,7 +18340,7 @@
         },
         render: async function() {
             if (this.prop.visible) {
-                this.el.style.display = 'flex';
+                this.el.style.display = 'block';
             } else {
                 this.el.style.display = 'none';
             }
@@ -18356,12 +18360,13 @@
         template: () => {
             const defaultIcon = getRandomMonsterIcon();
             return `
-          <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
-          <div>
-              <label>Name</label>
-              <input type="text" value="Unknown">
-              <input type='submit' value="Spawn">
-          </div>
+            <h2>Spawn new mob</h2>
+            <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
+            <div>
+                <label>Name</label>
+                <input type="text" value="Unknown">
+                <input type='submit' value="Spawn">
+            </div>
         `;
         },
         prop: {
@@ -18694,8 +18699,9 @@
         template: () => {
             return `
             <div class='image-picker'>
-              <main></main>
-              <footer><button>Cancel</button></footer>
+                <h2>Image picker</h2>
+                 <main></main>
+                <footer><button>Cancel</button></footer>
             </div>
         `;
         },

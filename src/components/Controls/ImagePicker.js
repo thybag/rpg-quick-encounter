@@ -89,8 +89,9 @@ export default Component.define({
     template: () => {
         return `
             <div class='image-picker'>
-              <main></main>
-              <footer><button>Cancel</button></footer>
+                <h2>Image picker</h2>
+                 <main></main>
+                <footer><button>Cancel</button></footer>
             </div>
         `;
     },
