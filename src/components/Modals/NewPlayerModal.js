@@ -1,5 +1,5 @@
 import BaseMobModal from './BaseMobModal.js';
-import {getRandomPlayerIcon} from '../../utils/getIconImage.js';;
+import {getRandomPlayerIcon} from '../../utils/getIconImage.js';
 
 export default BaseMobModal.define({
     // Setup
@@ -10,9 +10,9 @@ export default BaseMobModal.define({
         // Render base template
         const defaultIcon = getRandomPlayerIcon();
         this.el = this.tpl(
-            "Add Player",
-            "",
-            defaultIcon
+            'Add Player',
+            '',
+            defaultIcon,
         );
 
         // Create self on the global level as needed.
@@ -24,7 +24,7 @@ export default BaseMobModal.define({
         this.players.push({
             name: this.el.querySelector('input[type=text]').value,
             icon: this.el.querySelector('img').dataset.id,
-            spawned: true
+            spawned: true,
         });
 
         this.close();

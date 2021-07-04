@@ -1,7 +1,10 @@
 import Component from 'lumpjs/src/component.js';
 import dragSort from '../utils/dragSort.js';
 import getIconImage from '../utils/getIconImage.js';
+// Modals
 import NewPlayerModal from '../components/Modals/NewPlayerModal.js';
+import EditMobModal from '../components/Modals/EditMobModal.js';
+import ConfirmModal from '../components/Modals/ConfirmModal.js';
 
 const playerMap = new WeakMap();
 
@@ -17,8 +20,10 @@ export default Component.define({
     },
     events: {
         'click div': 'onPlayerSelect',
-        'click div.newPlayer span': 'newPlayer',
-        'player:added': 'makePlayerCard'
+        'dblclick div': 'onEdit',
+        'contextmenu div': 'onRemove',
+        'click div.newPlayer span': 'onNewPlayer',
+        'player:added': 'makePlayerCard',
     },
     template: (name, icon) => {
         return `
@@ -26,46 +31,23 @@ export default Component.define({
             <span>${name}</span>
         `;
     },
-    newPlayer: function() {
-        NewPlayerModal.make({players: this.players});
+    onEdit: function(e, target) {
+        const player = playerMap.get(target).refresh();
+        EditMobModal.make({target: player});
     },
-    makePlayerCard: function(player){
-        const playerCard = this.tpl(player.name, player.icon);
-        playerMap.set(playerCard, player);
+    onRemove: function(e, target) {
+        e.preventDefault();
 
-        // Set default attrs
-        playerCard.setAttribute('title', player.name);
-        if (player.spawned) playerCard.classList.add('spawned');
-
-        // Insert before the "add new" if needed
-        let addCard = this.el.querySelector('.newPlayer');
-        if (addCard) {
-             this.el.insertBefore(playerCard, addCard);
-        } else {
-             this.el.appendChild(playerCard);
-        }
-       
-        // Makes sortable
-        dragSort(playerCard);
-
-        // Listen for changes
-        player.on(`update:name`, (newName) => {
-            playerCard.querySelector('span').innerText = newName;
-            playerCard.setAttribute('title', newName);
+        const player = playerMap.get(target).refresh();
+        ConfirmModal.make({
+            question: 'Remove player from lineup?',
+            callback: () => {
+                player.removed = true;
+            },
         });
-        player.on(`update:icon`, (newIcon) => {
-            playerCard.querySelector('img').src = getIconImage(newIcon);
-        });
-
-        // Listen for spawn changes
-        player.on(`update:spawned`, (spawned) => {
-            if (spawned) {
-                playerCard.classList.add('spawned');
-            } else {
-                playerCard.classList.remove('spawned');
-            }
-        });
-        
+    },
+    onNewPlayer: function() {
+        NewPlayerModal.make({players: this.players});
     },
     onPlayerSelect: function(e, target) {
         const player = playerMap.get(target).refresh();
@@ -79,12 +61,57 @@ export default Component.define({
         // If already spawned lets focus them
         this.trigger('map:player:focus', player);
     },
+    makePlayerCard: function(player) {
+        // Skip removed players
+        if (player.removed) return;
+
+        const playerCard = this.tpl(player.name, player.icon);
+        playerMap.set(playerCard, player);
+
+        // Set default attrs
+        playerCard.setAttribute('title', player.name);
+        if (player.spawned) playerCard.classList.add('spawned');
+
+        // Insert before the "add new" if needed
+        const addCard = this.el.querySelector('.newPlayer');
+        if (addCard) {
+            this.el.insertBefore(playerCard, addCard);
+        } else {
+            this.el.appendChild(playerCard);
+        }
+
+        // Makes sortable
+        dragSort(playerCard);
+
+        // Listen for changes
+        player.on(`update:name`, (newName) => {
+            playerCard.querySelector('span').innerText = newName;
+            playerCard.setAttribute('title', newName);
+        });
+        player.on(`update:icon`, (newIcon) => {
+            playerCard.querySelector('img').src = getIconImage(newIcon);
+        });
+
+        // If card removed, remove it
+        player.on(`create:removed`, (newValue) => {
+            if (newValue) playerCard.remove();
+        });
+
+        // Listen for spawn changes
+        player.on(`update:spawned`, (spawned) => {
+            if (spawned) {
+                playerCard.classList.add('spawned');
+            } else {
+                playerCard.classList.remove('spawned');
+            }
+        });
+    },
     render: async function() {
         this.players.map((player) => {
             this.makePlayerCard(player);
         });
-        
-        let newEl = document.createElement('div');
+
+        const newEl = document.createElement('div');
         newEl.className = 'newPlayer';
         newEl.innerHTML ='<span>+</span><span>Add</span>';
         this.el.appendChild(newEl);

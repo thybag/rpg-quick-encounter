@@ -17921,6 +17921,49 @@
         },
     });
 
+    var ConfirmModal = Component$1.define({
+        callback: function(){},
+        initialize: function(options) {
+            this.callback = options.callback;
+
+            // Render base template
+            this.el = this.tpl(
+                options.question,
+            );
+
+            // Create self on the global level as needed.
+            document.body.appendChild(this.el);
+        },
+        // Events
+        events: {
+            'click button.cancel': 'close',
+            'click button.confirm': 'confirm',
+        },
+        // Templates
+        className: 'modal',
+        template: (question) => {
+            return `
+            <div class='remove-modal'>
+                <h2>${question}</h2>
+                <div>
+                    <button class="confirm">Yes</button>
+                    <button class="cancel">No</button>
+                </div>
+            </div>
+        `;
+        },
+        // Save data to target
+        confirm: function(e, target) {
+            this.callback();
+            this.close();
+        },
+       
+        // Remove modal
+        close: function() {
+            this.destroy();
+        },
+    });
+
     /**
      * Make Leaflet Marker
      *
@@ -18012,15 +18055,19 @@
         },
         characterRemove: function(event) {
             event.preventDefault;
-            if (confirm('Are you sure you want to remove this character?')) {
-                this.ref.spawned = false;
-            }
+
+            ConfirmModal.make({
+                question: "Remove character from map?",
+                callback: () => {
+                     this.ref.spawned = false;
+                }
+            });
         },
         render: function() {
             this.ref = this.ref.refresh();
 
             // Sync spawned?
-            if (!this.ref.spawned) {
+            if (!this.ref.spawned || this.ref.removed) {
                 this.marker.remove();
             } else {
                 this.marker.addTo(this.map);
@@ -18249,7 +18296,9 @@
         },
         events: {
             'click div': 'onPlayerSelect',
-            'click div.newPlayer span': 'newPlayer',
+            'dblclick div': 'onEdit',
+            'contextmenu div': 'onRemove',
+            'click div.newPlayer span': 'onNewPlayer',
             'player:added': 'makePlayerCard'
         },
         template: (name, icon) => {
@@ -18258,10 +18307,40 @@
             <span>${name}</span>
         `;
         },
-        newPlayer: function() {
+        onEdit: function(e, target) {
+            const player = playerMap.get(target).refresh();
+            EditMobModal.make({target: player});
+        },
+        onRemove: function(e, target){
+            e.preventDefault();
+
+            const player = playerMap.get(target).refresh();
+            ConfirmModal.make({
+                question: 'Remove player from lineup?',
+                callback: () => {
+                    player.removed = true;
+                }
+            });
+        },
+        onNewPlayer: function() {
             NewPlayerModal.make({players: this.players});
         },
+        onPlayerSelect: function(e, target) {
+            const player = playerMap.get(target).refresh();
+
+            // Spawn em to map if we want em
+            if (!player.spawned) {
+                player.spawned = true;
+                return;
+            }
+
+            // If already spawned lets focus them
+            this.trigger('map:player:focus', player);
+        },
         makePlayerCard: function(player){
+            // Skip removed players
+            if (player.removed) return;
+
             const playerCard = this.tpl(player.name, player.icon);
             playerMap.set(playerCard, player);
 
@@ -18289,6 +18368,11 @@
                 playerCard.querySelector('img').src = getIconImage(newIcon);
             });
 
+            // If card removed, remove it
+            player.on(`create:removed`, (newValue) => {
+                if (newValue) playerCard.remove();
+            });
+
             // Listen for spawn changes
             player.on(`update:spawned`, (spawned) => {
                 if (spawned) {
@@ -18296,20 +18380,7 @@
                 } else {
                     playerCard.classList.remove('spawned');
                 }
-            });
-            
-        },
-        onPlayerSelect: function(e, target) {
-            const player = playerMap.get(target).refresh();
-
-            // Spawn em to map if we want em
-            if (!player.spawned) {
-                player.spawned = true;
-                return;
-            }
-
-            // If already spawned lets focus them
-            this.trigger('map:player:focus', player);
+            }); 
         },
         render: async function() {
             this.players.map((player) => {

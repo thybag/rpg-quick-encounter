@@ -47,7 +47,7 @@ function isBefore(el1, el2) {
 
 /**
  * [description]
- * @param  {[type]} elements [description]
+ * @param  {[type]} el [description]
  */
 export default function(el) {
     el.addEventListener('dragend', dragEnd);

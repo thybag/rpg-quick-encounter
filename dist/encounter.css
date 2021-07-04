@@ -19,7 +19,7 @@ input[type='submit'], button {
     color:#fff;
     padding:.5rem;
 }
-input[type='submit']:hover {
+input[type='submit']:hover, button:hover {
     background:#1a8758;
 }
 
@@ -527,6 +527,44 @@ right: 1rem;
     right: calc(50% - (500px / 2));
 }
 
+/* remove-modal */
+
+
+.remove-modal {
+  position: absolute;
+  width:500px;
+  max-width:100vw;
+  font-size:0.9rem;
+  top: 1rem;
+  right: calc(50% - (500px / 2));
+  z-index: 1020;
+  background: #fff;
+  padding-bottom: .5rem;
+}
+
+.remove-modal h2 {
+    background:#24c37e;
+    padding: .5rem;
+    color: #fff;
+    margin: 0;
+}
+
+.remove-modal div {
+  display:block;
+  text-align: center;
+}
+.remove-modal button{
+    padding: .8rem 2rem;
+    margin: .5rem;
+
+}
+.remove-modal button.cancel {
+    background-color: #ddd;
+    color: #333;
+}
+.remove-modal button.cancel:hover {
+    background-color: #bbb;
+}
 
 /* Drag behaviors */
 

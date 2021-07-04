@@ -1,6 +1,6 @@
 import Component from 'lumpjs/src/component.js';
 import ImagePicker from '../controls/ImagePicker.js';
-import getIconImage from '../../utils/getIconImage.js';;
+import getIconImage from '../../utils/getIconImage.js';
 
 export default Component.define({
     // Templates

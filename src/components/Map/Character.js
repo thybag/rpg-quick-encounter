@@ -2,6 +2,7 @@ import L from 'leaflet';
 import Component from 'lumpjs/src/component.js';
 import getIconImage from '../../utils/getIconImage.js';
 import EditMobModal from '../Modals/EditMobModal.js';
+import ConfirmModal from '../Modals/ConfirmModal.js';
 
 /**
  * Make Leaflet Marker
@@ -94,15 +95,19 @@ export default Component.define({
     },
     characterRemove: function(event) {
         event.preventDefault;
-        if (confirm('Are you sure you want to remove this character?')) {
-            this.ref.spawned = false;
-        }
+
+        ConfirmModal.make({
+            question: 'Remove character from map?',
+            callback: () => {
+                this.ref.spawned = false;
+            },
+        });
     },
     render: function() {
         this.ref = this.ref.refresh();
 
         // Sync spawned?
-        if (!this.ref.spawned) {
+        if (!this.ref.spawned || this.ref.removed) {
             this.marker.remove();
         } else {
             this.marker.addTo(this.map);

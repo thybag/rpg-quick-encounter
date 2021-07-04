@@ -6,9 +6,9 @@ export default BaseMobModal.define({
 
         // Render base template
         this.el = this.tpl(
-            "Update Mob",
-            this.target.name, 
-            this.target.icon
+            'Update Mob',
+            this.target.name,
+            this.target.icon,
         );
 
         // Create self on the global level as needed.
