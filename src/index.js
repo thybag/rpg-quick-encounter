@@ -7,7 +7,7 @@ import {getRandomPlayerIconList} from './utils/getIconImage.js';
 // want people to include css files in the js itself, vs just giving styles
 // their on entry point, but what u gonna do.
 import 'leaflet/dist/leaflet.css';
-import './app.css';
+import './app.scss';
 
 // Define player defaults
 const defaultPlayers = [

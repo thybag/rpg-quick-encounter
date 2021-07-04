@@ -1,0 +1,42 @@
+$primary: #24c37e;
+$primary-hover: #1a8758;
+$primary-seperator: #95e1c0;
+
+@import 'scss/global.scss';
+@import 'scss/mixins.scss';
+// Core elements
+@import 'scss/map.scss';
+@import 'scss/control-bar.scss';
+@import 'scss/player-bar.scss';
+// Controls
+@import 'scss/fog-controls.scss';
+@import 'scss/spawn-controls.scss';
+@import 'scss/confirm-modal.scss';
+@import 'scss/image-picker.scss';
+
+@import 'scss/wizard.scss';
+@import 'scss/wizard-saves.scss';
+
+
+/* quick mobile mode tweaks */
+@media screen and (max-width: 800px) {
+    .fog-controls, .spawn-controls {
+        width:100vw;
+        max-width: none;
+        right:0;
+        bottom:40px;
+    }
+    .spawn-controls input {
+        max-width: 40vw;;
+    }
+    #player-bar {
+        bottom:4rem;
+    }
+    #control-bar {
+        display:flex;
+
+        span, a {
+            flex:1;
+        }
+    }
+}

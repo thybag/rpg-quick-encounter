@@ -17978,7 +17978,7 @@
         className: 'modal',
         template: (question) => {
             return `
-            <div class='remove-modal'>
+            <div class='confirm-modal'>
                 <h2>${question}</h2>
                 <div>
                     <button class="confirm">Yes</button>

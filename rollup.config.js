@@ -1,6 +1,6 @@
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs'; // Leaflet
-import css from 'rollup-plugin-import-css';
+import scss from 'rollup-plugin-scss'
 
 
 export default {
@@ -12,9 +12,8 @@ export default {
   plugins: [
 	  nodeResolve(),
 	  commonjs(),
-	  css({
-	  	output: 'encounter.css',
-	  	alwaysOutput:true
+	  scss({
+	  	output: 'dist/encounter.css'
 	  })
   ]
 };

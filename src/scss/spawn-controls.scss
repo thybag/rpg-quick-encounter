@@ -1,0 +1,50 @@
+/** Spawn controls */
+.spawn-controls {
+    position: absolute;
+    width:500px;
+    max-width:100vw;
+    font-size:0.9rem;
+    right: 1rem;
+    bottom: calc(40px + 1rem);
+    z-index: 1020;
+    background: #fff;
+    padding-bottom: .5rem;
+
+    h2 {
+        @include modal-h2;
+    }
+    div {
+        display:block;
+        float:left;
+        padding-top:1rem;
+
+        label {
+           display:block;
+        }
+        input {
+            padding:.5rem;
+            font-size:1.1rem;
+
+            &[type=text] {
+                width: 280px;
+            }
+            &[type=submit] {
+                padding: .5rem .8rem;
+                border: solid 2px $primary;
+            }
+        }
+    }
+    img {
+        padding:1rem;
+        display:block;
+        float:left;
+        cursor:pointer;
+        width:68px; cursor:pointer;
+    }
+}
+
+.modal .spawn-controls {
+    bottom: auto;
+    top: 1rem;
+    right: calc(50% - (500px / 2));
+}

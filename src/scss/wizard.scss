@@ -1,0 +1,134 @@
+/** Wizards */
+.wizard-container {
+    position:absolute;
+    top:0;
+    left:0;
+    right:0;
+    height: 100vh;
+    overflow: auto;
+}
+  .wizard, .save-zone {
+    width:50vw;
+    margin:3rem auto;
+    background:#fff;
+    box-shadow: 4px 4px 5px -3px #444;
+  }
+
+  @media screen and (max-width: 1500px) {
+    .wizard, .save-zone {
+      width: 80vw;
+    }
+  }
+
+  .wizard main,.wizard h1,.save-zone h2 {
+    padding:2rem;
+    margin-bottom:0;
+  }
+  .wizard h1 {
+    padding-bottom:0;
+  }
+  .wizard p{
+    margin-top:0;
+  }
+  .wizard label {
+    display:block;
+    padding-bottom:.5rem;
+  }
+  .wizard input {
+    padding:.5rem;
+    font-size:1.1rem;
+    width: 60%;
+  }
+  .wizard footer {
+    background:$primary;
+    display:flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .wizard footer button {
+    font-size:1.1rem;
+    padding: 1.2rem;
+    border:none;
+    background:auto;
+    background: inherit;
+    cursor:pointer;
+    border-left: solid 1px #95e1c0;
+    color:#fff;
+    padding-right: 2.5rem;
+    position: relative;
+  }
+  .wizard footer button:hover {
+    background: $primary-hover;
+  }
+  .wizard hr {
+    border: 0;
+      border-top: solid 1px #eee;
+      margin-bottom:1rem;
+  }
+
+  .wizard footer button:after {
+    content: '\203A';
+    font-size:2.5rem;
+    position: absolute;
+    line-height: 1rem;
+    right: 1rem;
+  }
+
+    .wizard .more {
+        display: block;
+        margin: 1rem 0;
+        color: #bbb;
+        text-align: center;
+        margin-top:2rem;
+        cursor: pointer;
+    }
+    .wizard .advanced {
+        max-height:0;
+        overflow: auto;
+        transition: .3s max-height;
+    }
+    .wizard .advanced.show {
+        max-height:600px;
+    }
+    .wizard .advanced input {
+        width:40%;
+    }
+    .wizard .advanced h2 {margin-top:0;}
+
+    .wizard .player-option {
+        margin-bottom: 1rem;
+    }
+    .wizard .player-option span.icon {
+        margin-right:1rem;
+        float:left;
+        width:60px;
+    }
+    .wizard .player-option span.icon img {
+        height: 55px;
+        cursor:pointer;
+    }
+    .wizard .player-option span.remove {
+        cursor:pointer;
+    }
+        
+    .wizard .player-option input {
+        margin-top: .5rem;
+    }
+
+    .wizard .more:after { 
+        content: '';
+        height: 12px;
+        display: block;
+        width: 110px;
+        background:#fff;
+        margin:auto;
+        margin-top: -14px;
+    }
+    .wizard .more:before { 
+        content: '';
+        border-top: solid 1px #eee;
+        display: block;
+        margin-bottom:-12px;
+
+    }   
