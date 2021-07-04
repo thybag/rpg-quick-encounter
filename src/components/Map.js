@@ -45,8 +45,15 @@ export default Component.define({
         'create:players.*': 'spawnPlayer',
         'create:spawns.*': 'spawnNpc',
         // fog data listeners
+        'update:fog.mask': 'fogMaskUpdated',
         'update:fog.enabled': 'fogToggled',
         'update:fog.opacity': 'fogOpacityChanged',
+    },
+    fogMaskUpdated: function(mask) {
+        // Import new mask
+        this.fog.initFog(JSON.parse(mask));
+        // Redraw fog only when change has been detected.
+        this.fog.redraw();
     },
     // Map actions
     spawnPlayer: function(player) {
@@ -86,6 +93,9 @@ export default Component.define({
         this.fog.addFog(e.latlng, this.options.get('fog.clearSize'));
         this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
     },
+    fogRefresh: function() {
+        this.fog.initFog(JSON.parse(this.options.get('fog.mask')));
+    },
     // Render changes
     render: function() {
         // Reload save data
@@ -93,7 +103,7 @@ export default Component.define({
         if (!this.options.get('fog.mask')) {
             this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
         } else {
-            this.fog.initFog(JSON.parse(this.options.get('fog.mask')));
+            this.fogRefresh();
         }
 
         this.fogOpacityChanged(this.options.get('fog.opacity'));

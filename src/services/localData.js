@@ -34,7 +34,9 @@ export default new function() {
     };
 
     this.loadMap = function(key) {
-        return this._get(mapPrefix + key);
+        const map = this._get(mapPrefix + key);
+        map['data:updated'] = null;
+        return map;
     };
 
     this.saveMap = function(key, data) {
@@ -110,7 +112,9 @@ export default new function() {
         const dataKey = dataPrefix + mapPrefix + map;
         window.addEventListener('storage', (change) => {
             if (change.key === dataKey) {
-                callback(JSON.parse(change.newValue));
+                const newMap = JSON.parse(change.newValue);
+                newMap['data:updated'] = null;
+                callback(newMap);
             }
         });
     };

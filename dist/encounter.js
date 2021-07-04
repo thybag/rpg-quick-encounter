@@ -557,6 +557,7 @@
                 if (typeof updated === 'undefined' && typeof original === 'undefined') returnType = 'REMOVE';
                 if (typeof original === 'undefined') returnType = 'CREATE';
                 if (typeof updated === 'undefined') returnType = 'REMOVE';
+                if (results.length === 0) returnType = 'NONE'; // Empty
 
                 // If all the sub objects were unchanged, the ob was unchanged.
                 if (results.length !== 0 && results.every(function(val) {
@@ -17473,12 +17474,12 @@
             leafletSrc.Polygon.prototype.initialize.call(this, [this._boundsToLatLngs(bounds)], options);
         },
         initFog: function(mask) {
-        // Load mask back to fog format & apply it from reload
+            // Load mask back to fog format & apply it from reload
             const newFog = fog$1.loadCutOuts(mask);
             this.applyFog(newFog);
         },
         clearFog: function(latLng, size = 36) {
-        // Get area Poly
+            // Get area Poly
             const areaPoly = circleToPolygon([latLng.lat, latLng.lng], size);
             const cutouts = fog$1.addCutOut(areaPoly);
 
@@ -17498,7 +17499,7 @@
             cutouts.map((value, index) => {
                 this._latlngs[index + 1] = this._convertLatLngs(value);
             });
-            return this.redraw();
+            return true;
         },
     });
 
@@ -17553,7 +17554,9 @@
         };
 
         this.loadMap = function(key) {
-            return this._get(mapPrefix + key);
+            const map = this._get(mapPrefix + key);
+            map['data:updated'] = null;
+            return map;
         };
 
         this.saveMap = function(key, data) {
@@ -17629,7 +17632,9 @@
             const dataKey = dataPrefix + mapPrefix + map;
             window.addEventListener('storage', (change) => {
                 if (change.key === dataKey) {
-                    callback(JSON.parse(change.newValue));
+                    const newMap = JSON.parse(change.newValue);
+                    newMap['data:updated'] = null;
+                    callback(newMap);
                 }
             });
         };
@@ -18009,6 +18014,7 @@
         return leafletSrc.marker(
             position,
             {
+                icon: leafletSrc.divIcon(),
                 draggable: true,
             },
         );
@@ -18036,8 +18042,8 @@
 
             // Set initial position if not already defined.
             if (!this.ref.x || !this.ref.y) {
-                this.ref.x = map.getCenter().lat;
-                this.ref.y = map.getCenter().lng;
+                this.ref.x = map.getCenter().lng;
+                this.ref.y = map.getCenter().lat;
             }
 
             this.marker = makeMarker(
@@ -18094,7 +18100,7 @@
             ConfirmModal.make({
                 question: 'Remove character from map?',
                 callback: () => {
-                    this.ref.spawned = false;
+                    this.ref.refresh().spawned = false;
                 },
             });
         },
@@ -18164,8 +18170,15 @@
             'create:players.*': 'spawnPlayer',
             'create:spawns.*': 'spawnNpc',
             // fog data listeners
+            'update:fog.mask': 'fogMaskUpdated',
             'update:fog.enabled': 'fogToggled',
             'update:fog.opacity': 'fogOpacityChanged',
+        },
+        fogMaskUpdated: function(mask){
+            // Import new mask
+            this.fog.initFog(JSON.parse(mask));
+            // Redraw fog only when change has been detected.
+            this.fog.redraw();
         },
         // Map actions
         spawnPlayer: function(player) {
@@ -18205,6 +18218,9 @@
             this.fog.addFog(e.latlng, this.options.get('fog.clearSize'));
             this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
         },
+        fogRefresh: function(){
+            this.fog.initFog(JSON.parse(this.options.get('fog.mask')));
+        },
         // Render changes
         render: function() {
             // Reload save data
@@ -18212,7 +18228,7 @@
             if (!this.options.get('fog.mask')) {
                 this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
             } else {
-                this.fog.initFog(JSON.parse(this.options.get('fog.mask')));
+                this.fogRefresh();
             }
 
             this.fogOpacityChanged(this.options.get('fog.opacity'));
@@ -19341,7 +19357,7 @@
             if (!p.icon) {
                 p.icon = iconList[index];
             }
-            return {id: index, name: p.name, icon: p.icon, spawned: false, x: 0, y: 0};
+            return {id: index, name: p.name, icon: p.icon, spawned: false};
         });
 
         return players;

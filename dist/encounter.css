@@ -45,9 +45,6 @@ input[type=submit]:hover, button:hover {
   /* Map styles */
   /* Drag behaviors */
 }
-#map .character-icon {
-  position: relative;
-}
 #map .character-icon img {
   width: 100%;
   padding: 0.2rem;

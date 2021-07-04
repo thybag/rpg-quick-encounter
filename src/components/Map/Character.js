@@ -14,6 +14,7 @@ function makeMarker(position) {
     return L.marker(
         position,
         {
+            icon: L.divIcon(),
             draggable: true,
         },
     );
@@ -41,8 +42,8 @@ export default Component.define({
 
         // Set initial position if not already defined.
         if (!this.ref.x || !this.ref.y) {
-            this.ref.x = map.getCenter().lat;
-            this.ref.y = map.getCenter().lng;
+            this.ref.x = map.getCenter().lng;
+            this.ref.y = map.getCenter().lat;
         }
 
         this.marker = makeMarker(
@@ -99,7 +100,7 @@ export default Component.define({
         ConfirmModal.make({
             question: 'Remove character from map?',
             callback: () => {
-                this.ref.spawned = false;
+                this.ref.refresh().spawned = false;
             },
         });
     },

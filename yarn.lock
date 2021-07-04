@@ -2248,7 +2248,7 @@ lru-cache@^6.0.0:
 
 "lumpjs@https://github.com/thybag/lump.js.git":
   version "0.0.1"
-  resolved "https://github.com/thybag/lump.js.git#5338f0017b73caa9ac0fd7cd6396f98d62d7650e"
+  resolved "https://github.com/thybag/lump.js.git#c23b24408873f51605df2ddecb6754e1e68e3a5c"
 
 magic-string@^0.25.7:
   version "0.25.7"

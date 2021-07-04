@@ -87,7 +87,7 @@ function configurePlayers(players) {
         if (!p.icon) {
             p.icon = iconList[index];
         }
-        return {id: index, name: p.name, icon: p.icon, spawned: false, x: 0, y: 0};
+        return {id: index, name: p.name, icon: p.icon, spawned: false};
     });
 
     return players;
