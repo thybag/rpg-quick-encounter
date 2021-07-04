@@ -10,8 +10,6 @@ export default Component.define({
 
         // Create self on the global level as needed.
         document.body.appendChild(this.el);
-
-        this.picker = null;
     },
     className: 'spawn-controls',
     template: () => {
@@ -27,25 +25,20 @@ export default Component.define({
     },
     prop: {
         visible: false,
-        mode: 'spawn',
-        target: null,
     },
     events: {
         'click img': 'openPickList',
         'click input[type=submit]': 'save',
     },
     openPickList: function(e, target) {
-        if (!this.picker) this.picker = ImagePicker.make();
-        this.picker.open(target);
+        ImagePicker.make({target});
     },
     save: function(e, target) {
         // default
-        if (this.prop.mode == 'spawn') {
-            this.trigger('map:spawn', {
-                name: this.el.querySelector('input[type=text]').value,
-                icon: this.el.querySelector('img').dataset.id,
-            });
-        }
+        this.trigger('map:spawn', {
+            name: this.el.querySelector('input[type=text]').value,
+            icon: this.el.querySelector('img').dataset.id,
+        });
     },
     toggle: function() {
         this.prop.visible ? this.hide() : this.show();
@@ -66,10 +59,6 @@ export default Component.define({
             this.el.style.display = 'none';
         }
 
-        if (this.prop.mode == 'spawn') {
-            this.el.querySelector('[type=submit]').value = 'Spawn';
-        } else {
-            this.el.querySelector('[type=submit]').value = 'Save';
-        }
+        this.el.querySelector('[type=submit]').value = 'Spawn';
     },
 });

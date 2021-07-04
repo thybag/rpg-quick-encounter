@@ -35,7 +35,6 @@ export default Component.define({
     },
     render: async function() {
         this.players.map((player, index) => {
-
             const playerCard = this.tpl(player.name, player.icon);
             playerMap.set(playerCard, player);
 

@@ -74,7 +74,7 @@ export default Component.define({
         event.preventDefault;
 
         // Bring character to the front
-        globalZIndexOffset++
+        globalZIndexOffset++;
         this.marker.setZIndexOffset(globalZIndexOffset*1000);
     },
     characterDblClick: function(event) {

@@ -432,28 +432,7 @@ input[type='submit']:hover {
       height:152px;
     }
 
-/* quick mobile mode tweaks */
-@media screen and (max-width: 800px) {
-    .app .fog-controls, .spawn-controls {
-        width:100vw;
-        max-width: none;
-        right:0;
-        bottom:40px;
-    }
-    .spawn-controls input {
-        max-width: 40vw;;
-    }
-    
-    .app #player-bar {
-        bottom:4rem;
-    }
-    .app #control-bar {
-        display:flex;
-    }
-    .app #control-bar span, .app #control-bar a {
-        flex:1;
-    }
-}
+
 
 .uploadHover main {
   filter: blur(3px);
@@ -476,8 +455,8 @@ input[type='submit']:hover {
     color:#fff;
 }
 
-
-.spawn-modal {
+/** Modal backdrop */
+.modal {
     position: absolute;
     top: 0;
     left: 0;
@@ -487,22 +466,24 @@ input[type='submit']:hover {
     background-color: rgba(0,0,0,0.8);
     cursor: pointer;
 }
-.spawn-modal > div {
+
+
+.modal .spawn-controls {
     bottom: auto;
     top: 1rem;
     right: calc(50% - (500px / 2));
 }
 
-.spawn-modal .spawn-controls h2 {
+.modal .spawn-controls h2 {
     background:#24c37e;
     padding: .5rem;
     color: #fff;
     margin: 0;
 }
-.spawn-modal .spawn-controls input[type=text] {
+.modal .spawn-controls input[type=text] {
     width: 280px;
 }
-.spawn-modal .spawn-controls input[type=submit] {
+.modal .spawn-controls input[type=submit] {
     padding: .5rem .8rem;
     border: solid 2px #24c37e;
 }
@@ -515,6 +496,28 @@ input[type='submit']:hover {
 }
 
 
+/* quick mobile mode tweaks */
+@media screen and (max-width: 800px) {
+    .app .fog-controls, .spawn-controls {
+        width:100vw;
+        max-width: none;
+        right:0;
+        bottom:40px;
+    }
+    .spawn-controls input {
+        max-width: 40vw;;
+    }
+    
+    .app #player-bar {
+        bottom:4rem;
+    }
+    .app #control-bar {
+        display:flex;
+    }
+    .app #control-bar span, .app #control-bar a {
+        flex:1;
+    }
+}
 /* required styles */
 
 .leaflet-pane,

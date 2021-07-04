@@ -16,7 +16,7 @@ export default Component.define({
         document.body.appendChild(this.el);
     },
     // Templates
-    className: 'spawn-modal',
+    className: 'modal',
     template: (name, icon) => {
         return `
             <div class='spawn-controls'>
@@ -32,7 +32,7 @@ export default Component.define({
     },
     // Events
     events: {
-        'click .spawn-modal': 'close',
+        'click .modal': 'close',
         'click img': 'openPickList',
         'click input[type=submit]': 'save',
         'keyup input[type=text]': 'detectSubmit',
@@ -55,7 +55,6 @@ export default Component.define({
     },
     // Open image picker
     openPickList: function(e, target) {
-        if (!this.picker) this.picker = ImagePicker.make();
-        this.picker.open(target);
+        ImagePicker.make({target});
     },
 });

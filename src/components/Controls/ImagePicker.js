@@ -79,27 +79,28 @@ async function imageToIcon(iconImg) {
 export default Component.define({
     initialize: function(options) {
         this.el = this.tpl();
-        this.el.style.display = 'none';
+        this.parent = options.target;
 
+        this.render();
         // Add to world
         document.body.appendChild(this.el);
     },
-    className: 'image-picker',
+    className: 'modal',
     template: () => {
         return `
-          <main></main>
-          <footer><button>Cancel</button></footer>
+            <div class='image-picker'>
+              <main></main>
+              <footer><button>Cancel</button></footer>
+            </div>
         `;
-    },
-    parent: null,
-    prop: {
-        visible: false,
     },
     events: {
         'click img': 'select',
-        'click button': 'close',
         'click span': 'addIcon',
-
+        // Close options
+        'click button': 'close',
+        'click .modal': 'close',
+        // Upload options
         'dragover main': 'uploadEnable',
         'drop main': 'upload',
         'dragenter main': 'uploadFocus',
@@ -109,11 +110,6 @@ export default Component.define({
     // Need this to be able to upload.
         e.preventDefault();
     },
-    open: function(parent) {
-        this.prop.visible = true;
-        this.parent = parent;
-        this.render();
-    },
     select: function(e, item) {
         this.parent.src = item.src;
         this.parent.dataset.id = (item.dataset.id) ? item.dataset.id : item.src;
@@ -121,9 +117,7 @@ export default Component.define({
         this.close();
     },
     close: function() {
-        this.parent = null;
-        this.prop.visible = false;
-        this.render();
+        this.destroy();
     },
     uploadFocus: function(e) {
         e.preventDefault();
@@ -164,11 +158,5 @@ export default Component.define({
     },
     render: async function() {
         this.el.querySelector('main').innerHTML = iconList.render().innerHTML;
-
-        if (this.prop.visible) {
-            this.el.style.display = 'block';
-        } else {
-            this.el.style.display = 'none';
-        }
     },
 });

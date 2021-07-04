@@ -17777,27 +17777,28 @@
     var ImagePicker$1 = Component$1.define({
         initialize: function(options) {
             this.el = this.tpl();
-            this.el.style.display = 'none';
+            this.parent = options.target;
 
+            this.render();
             // Add to world
             document.body.appendChild(this.el);
         },
-        className: 'image-picker',
+        className: 'modal',
         template: () => {
             return `
-          <main></main>
-          <footer><button>Cancel</button></footer>
+            <div class='image-picker'>
+              <main></main>
+              <footer><button>Cancel</button></footer>
+            </div>
         `;
-        },
-        parent: null,
-        prop: {
-            visible: false,
         },
         events: {
             'click img': 'select',
-            'click button': 'close',
             'click span': 'addIcon',
-
+            // Close options
+            'click button': 'close',
+            'click .modal': 'close',
+            // Upload options
             'dragover main': 'uploadEnable',
             'drop main': 'upload',
             'dragenter main': 'uploadFocus',
@@ -17807,11 +17808,6 @@
         // Need this to be able to upload.
             e.preventDefault();
         },
-        open: function(parent) {
-            this.prop.visible = true;
-            this.parent = parent;
-            this.render();
-        },
         select: function(e, item) {
             this.parent.src = item.src;
             this.parent.dataset.id = (item.dataset.id) ? item.dataset.id : item.src;
@@ -17819,9 +17815,7 @@
             this.close();
         },
         close: function() {
-            this.parent = null;
-            this.prop.visible = false;
-            this.render();
+            this.destroy();
         },
         uploadFocus: function(e) {
             e.preventDefault();
@@ -17862,12 +17856,6 @@
         },
         render: async function() {
             this.el.querySelector('main').innerHTML = iconList$1.render().innerHTML;
-
-            if (this.prop.visible) {
-                this.el.style.display = 'block';
-            } else {
-                this.el.style.display = 'none';
-            }
         },
     });
 
@@ -17885,7 +17873,7 @@
             document.body.appendChild(this.el);
         },
         // Templates
-        className: 'spawn-modal',
+        className: 'modal',
         template: (name, icon) => {
             return `
             <div class='spawn-controls'>
@@ -17901,7 +17889,7 @@
         },
         // Events
         events: {
-            'click .spawn-modal': 'close',
+            'click .modal': 'close',
             'click img': 'openPickList',
             'click input[type=submit]': 'save',
             'keyup input[type=text]': 'detectSubmit',
@@ -17924,8 +17912,7 @@
         },
         // Open image picker
         openPickList: function(e, target) {
-            if (!this.picker) this.picker = ImagePicker$1.make();
-            this.picker.open(target);
+            ImagePicker$1.make({target});
         },
     });
 
@@ -18083,25 +18070,23 @@
         },
         // Events
         events: {
+            // Local events
             'map:click': 'fogClear',
             'map:contextmenu': 'fogAdd',
-            //'map:player:spawn': 'spawnPlayer',
             'map:player:focus': 'focusPlayer',
-
+            // mob data listeners
             'create:players.*': 'spawnPlayer',
             'create:spawns.*': 'spawnNpc',
-
+            // fog data listeners
             'update:fog.enabled': 'fogToggled',
             'update:fog.opacity': 'fogOpacityChanged',
         },
         // Map actions
         spawnPlayer: function(player) {
-            console.log("spawn player called", player);
             const marker = this.generateMarker(player.name, player.icon, player);
             playerToIconMap[player.id] = marker;
         },
         spawnNpc: function(npc) {
-            console.log("spawn npc called", npc);
             const marker = this.generateMarker(npc.name, npc.icon, npc);
             npcToIconMap[npc.id] = marker;
         },
@@ -18251,7 +18236,6 @@
         },
         render: async function() {
             this.players.map((player, index) => {
-
                 const playerCard = this.tpl(player.name, player.icon);
                 playerMap.set(playerCard, player);
 
@@ -18367,8 +18351,6 @@
 
             // Create self on the global level as needed.
             document.body.appendChild(this.el);
-
-            this.picker = null;
         },
         className: 'spawn-controls',
         template: () => {
@@ -18384,25 +18366,20 @@
         },
         prop: {
             visible: false,
-            mode: 'spawn',
-            target: null,
         },
         events: {
             'click img': 'openPickList',
             'click input[type=submit]': 'save',
         },
         openPickList: function(e, target) {
-            if (!this.picker) this.picker = ImagePicker$1.make();
-            this.picker.open(target);
+            ImagePicker$1.make({target});
         },
         save: function(e, target) {
             // default
-            if (this.prop.mode == 'spawn') {
-                this.trigger('map:spawn', {
-                    name: this.el.querySelector('input[type=text]').value,
-                    icon: this.el.querySelector('img').dataset.id,
-                });
-            }
+            this.trigger('map:spawn', {
+                name: this.el.querySelector('input[type=text]').value,
+                icon: this.el.querySelector('img').dataset.id,
+            });
         },
         toggle: function() {
             this.prop.visible ? this.hide() : this.show();
@@ -18423,11 +18400,7 @@
                 this.el.style.display = 'none';
             }
 
-            if (this.prop.mode == 'spawn') {
-                this.el.querySelector('[type=submit]').value = 'Spawn';
-            } else {
-                this.el.querySelector('[type=submit]').value = 'Save';
-            }
+            this.el.querySelector('[type=submit]').value = 'Spawn';
         },
     });
 
@@ -18711,27 +18684,28 @@
     var ImagePicker = Component$1.define({
         initialize: function(options) {
             this.el = this.tpl();
-            this.el.style.display = 'none';
+            this.parent = options.target;
 
+            this.render();
             // Add to world
             document.body.appendChild(this.el);
         },
-        className: 'image-picker',
+        className: 'modal',
         template: () => {
             return `
-          <main></main>
-          <footer><button>Cancel</button></footer>
+            <div class='image-picker'>
+              <main></main>
+              <footer><button>Cancel</button></footer>
+            </div>
         `;
-        },
-        parent: null,
-        prop: {
-            visible: false,
         },
         events: {
             'click img': 'select',
-            'click button': 'close',
             'click span': 'addIcon',
-
+            // Close options
+            'click button': 'close',
+            'click .modal': 'close',
+            // Upload options
             'dragover main': 'uploadEnable',
             'drop main': 'upload',
             'dragenter main': 'uploadFocus',
@@ -18741,11 +18715,6 @@
         // Need this to be able to upload.
             e.preventDefault();
         },
-        open: function(parent) {
-            this.prop.visible = true;
-            this.parent = parent;
-            this.render();
-        },
         select: function(e, item) {
             this.parent.src = item.src;
             this.parent.dataset.id = (item.dataset.id) ? item.dataset.id : item.src;
@@ -18753,9 +18722,7 @@
             this.close();
         },
         close: function() {
-            this.parent = null;
-            this.prop.visible = false;
-            this.render();
+            this.destroy();
         },
         uploadFocus: function(e) {
             e.preventDefault();
@@ -18796,12 +18763,6 @@
         },
         render: async function() {
             this.el.querySelector('main').innerHTML = iconList.render().innerHTML;
-
-            if (this.prop.visible) {
-                this.el.style.display = 'block';
-            } else {
-                this.el.style.display = 'none';
-            }
         },
     });
 

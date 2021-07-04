@@ -37,25 +37,23 @@ export default Component.define({
     },
     // Events
     events: {
+        // Local events
         'map:click': 'fogClear',
         'map:contextmenu': 'fogAdd',
-        //'map:player:spawn': 'spawnPlayer',
         'map:player:focus': 'focusPlayer',
-
+        // mob data listeners
         'create:players.*': 'spawnPlayer',
         'create:spawns.*': 'spawnNpc',
-
+        // fog data listeners
         'update:fog.enabled': 'fogToggled',
         'update:fog.opacity': 'fogOpacityChanged',
     },
     // Map actions
     spawnPlayer: function(player) {
-        console.log("spawn player called", player);
         const marker = this.generateMarker(player.name, player.icon, player);
         playerToIconMap[player.id] = marker;
     },
     spawnNpc: function(npc) {
-        console.log("spawn npc called", npc);
         const marker = this.generateMarker(npc.name, npc.icon, npc);
         npcToIconMap[npc.id] = marker;
     },
