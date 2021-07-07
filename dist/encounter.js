@@ -3,20 +3,21 @@
 
     /**
      * [safeText description]
-     * @param  {[type]} text [description]
+     * @param  {[type]} data [description]
      * @return {[type]}      [description]
      */
-    function safeText$1(text) {
+    function safeText$1(data) {
         // Recusivly make sub objects safe
-        if (typeof text === 'object') {
-            return text.map((value) => {
-                return safeText$1(value);
+        if (typeof data === 'object') {
+            Object.entries(data).forEach(([key, value]) => {
+                data[key] = safeText$1(value);
             });
+            return data;
         }
 
         // Render as text node
         const html = document.createElement('p');
-        html.appendChild(document.createTextNode(text));
+        html.appendChild(document.createTextNode(data));
         return html.innerHTML;
     }
 
@@ -31,14 +32,14 @@
             // Escape input values
             if (methods.safe !== false) {
                 // Ensure args are safe
-                args = args.map((value) => {
+                args = args.map( (value) => {
                     return safeText$1(value);
                 });
             }
 
             // Render template itself
             const container = document.createElement('div');
-            const tpl = methods.template(...args);
+            const tpl = (typeof methods.template === 'function') ? methods.template(...args) : methods.template;
             container.innerHTML = tpl;
 
             if (methods.className) {
@@ -58,6 +59,482 @@
      */
     function makeTemplate(...args) {
         return new Template$1(...args);
+    }
+
+    const jsPathRegex = /([^[.\]])+/g;
+
+    /**
+     * Basic model to watch data. Will fire events on changed parts of data tree.
+     *
+     * @param {object} _data - Initial data for model to hold.
+     */
+    const Model = function(_data) {
+        const parent = this;
+
+        // Cache data access/edit
+        const _cache = new WeakMap();
+        const _original = JSON.parse(JSON.stringify(_data));
+
+        // Live data proxy
+        const _real = newDataProxy(_data, '');
+
+        // Eventing
+        this._events = {};
+        this._subscribers = [];
+
+        // Private methods
+
+        /**
+         * _get value from real store
+         *
+         * @param  {[type]} key      [description]
+         * @param  {[type]} fallback [description]
+         * @return {[type]}          [description]
+         */
+        function _get(key, fallback = undefined) {
+            if (!key) return _real;
+
+            const keyArray = Array.isArray(key) ? key : key.match(jsPathRegex);
+            const result = (
+                keyArray.reduce((prevObj, key) => prevObj && prevObj[key], _real)
+            );
+
+            if (result === undefined) return fallback;
+            return result;
+        }
+
+        /**
+         * _set value on real object in store
+         *
+         * @param {string} key      Object path using dot or array notation.
+         * @param {[type]} value [description]
+         * @return {boolean} sucess
+         */
+        function _set(key, value) {
+            // Get key path
+            const keyArray = Array.isArray(key) ? key : key.match(jsPathRegex);
+            // Setup vars
+            let base = _real;
+            let insert; let insertLocation;
+
+            // Iterate object
+            for (let i = 0; i < keyArray.length; i++ ) {
+                if (i === keyArray.length - 1) {
+                    base[keyArray[i]] = value;
+                } else {
+                    // If we need to create new objects as we walk the path, we need to
+                    // do this in a new object rather than updating the existing tree directly.
+                    // This is so that we avoid fireing duplicate update events after each nested
+                    // object is added, and instead attach the object all in one go.
+                    if (base[keyArray[i]] === undefined) {
+                        // If we start building a new tree, track where we need to reinsert
+                        if (!insertLocation) {
+                            insertLocation = [base, keyArray[i]];
+                            insert = base = {};
+                        }
+                        base[keyArray[i]] = {};
+                    }
+
+                    // Get next level
+                    base = base[keyArray[i]];
+                }
+            }
+
+            // If we've build an external object, inject it into the model again
+            if (insertLocation) {
+                const [location, key] = insertLocation;
+                location[key] = insert[key];
+            }
+
+            return true;
+        }
+
+        /**
+         * Apply data changes
+         * @param  {[type]} ctx [description]
+         */
+        function applyChanges(ctx) {
+            // Detect changes to data, fireing events as needed.
+            const change = parent.detectChanges(ctx.split('.'), _original, _data);
+
+            // Update internal data cache to match
+            if (change !== 'NONE') {
+                parent.commitChanges(ctx.split('.'), _original, _data);
+                parent.trigger('updated');
+            }
+        }
+
+        /**
+         * Create watcher proxy to manage each object in model
+         * Provides access to get,set,on helpers + wraps access in proxies
+         * in order to allow for dynamic change detection
+         *
+         * @param  {object} result  data to wrap in proxy
+         * @param  {string} context datapath to current object
+         * @return {Proxy}          Object wrapped in Proxy
+         */
+        function newDataProxy(result, context) {
+            const proxyTraps = {
+                get(obj, prop, receiver) {
+                    // Get real data from object
+                    const result = Reflect.get(obj, prop);
+
+                    // Return primitive or data wrapped in proxy
+                    return parent.isObject(result) ? newDataProxy(result, getContext(context, prop)) : result;
+                },
+                set(obj, prop, value) {
+                    // Update local object
+                    const success = Reflect.set(obj, prop, value);
+                    // Trigger change detection and sync to original
+                    applyChanges(getContext(context, prop));
+
+                    return success;
+                },
+            };
+
+            // Config proxy or get from cache
+            const resultProxy = _cache.get(result) || new Proxy(result, proxyTraps);
+            _cache.set(result, resultProxy);
+            return resultProxy;
+        }
+
+        /**
+         * Create accessor proxy to manage access to data model
+         * Holds a context data-path, which is then uses to get/set
+         * data from the store.
+         *
+         * This approach means that stored re fences in code will never
+         * become out of data, or become orphaned from the store
+         *
+         * @param  {string} context datapath to current object
+         * @return {Proxy}          Object wrapped in Proxy
+         */
+        function newAccessProxy(context) {
+            const proxyTraps = {
+                get(obj, prop, receiver) {
+                    // Handle magic methods for object
+                    if (prop === 'get') return magicGet(parent, context);
+                    if (prop === 'set') return magicSet(parent, context);
+                    if (prop === 'on') return magicOn(parent, context);
+                    if (prop === 'getContext') return () => context;
+                    // Support json stringify by pass access to the real object
+                    if (prop === 'toJSON') return () => _get(context);
+
+                    // else just get as normal
+                    return parent.get(getContext(context, prop));
+                },
+                set(obj, prop, value) {
+                    // Set data to the context path
+                    return parent.set(getContext(context, prop), value);
+                },
+                ownKeys() {
+                    return Object.keys(_get(context));
+                },
+                getOwnPropertyDescriptor() {
+                    return {configurable: true, enumerable: true, value: '123'};
+                },
+                has(obj, prop) {
+                    /* eslint-disable no-prototype-builtins */
+                    // We don't know the type of the souce object
+                    // so have to blindly pass this down
+                    return _get(context).hasOwnProperty(prop);
+                },
+            };
+
+            // Return access proxy
+            return new Proxy({}, proxyTraps);
+        }
+
+        /**
+         * Get data from the store
+         *
+         * @param  {[type]} key      [description]
+         * @param  {[type]} fallback [description]
+         * @return {primitive|accessProxy}          [description]
+         */
+        this.get = (key, fallback) => {
+            const result = _get(key, fallback);
+            return (parent.isObject(result)) ? newAccessProxy(key) : result;
+        };
+
+        /**
+         * Set data to the store
+         * @param  {[type]} key   [description]
+         * @param  {[type]} value [description]
+         * @return {[type]}       [description]
+         */
+        this.set = (key, value) => _set(key, value);
+
+        // get data
+        this.data = this.get();
+    };
+
+
+    /**
+     * Trigger event on model
+     *
+     * @param  {[type]}    event [description]
+     * @param  {...[type]} args  [description]
+     */
+    Model.prototype.trigger = function(event, ...args) {
+        // Fire own event
+        for (const i of this._events[event] || []) {
+            // Trigger event (either func or method to call)
+            if (typeof i[1] === 'function') {
+                i[1](...args);
+            } else {
+                this[i[1]](...args);
+            }
+        }
+
+        // Fire listeners
+        for (const [subscriber, ns] of this._subscribers) {
+            // Optionally namespace listener.
+            // e.g. players:update:name
+            const namespace = ns ? ns+':' : '';
+            subscriber.trigger(namespace+event, ...args);
+        }
+    };
+
+    /**
+     * Listen for event on model
+     * @param  {string} key    Object path using dot or array notation.
+     * @param  {[type]} method [description]
+     * @return {[type]}        [description]
+     */
+    Model.prototype.on = function(key, method) {
+        (this._events[key] = this._events[key] || []).push([key, method]);
+        return this;
+    };
+
+    /**
+     * Remove event listener
+     * @param  {string} key    Object path using dot or array notation.
+     * @param  {[type]} method [description]
+     * @return {[type]}        [description]
+     */
+    Model.prototype.off = function(key, method) {
+        if (!this._events[key]) return this;
+
+        // Delete all listners if no method
+        if (!method) {
+            delete this._events[key];
+            return this;
+        }
+        // Else only one with method
+        for (const evt in this._events[key]) {
+            if (this._events[key][evt][1] == method) {
+                this._events[key].splice(evt, 1);
+            }
+        }
+
+        return this;
+    };
+
+    /**
+     * Register self as an external listener for model events
+     * @param {[type]} subscriber [description]
+     * @param {[type]} namespace [description]
+     * @return {object} model
+     */
+    Model.prototype.subscribe = function(subscriber, namespace = '') {
+        if (typeof subscriber.trigger !== 'function') {
+            throw new Error('Unsupported listener type provided. Must implement trigger method.');
+        }
+        this._subscribers.push([subscriber, namespace]);
+        return this;
+    };
+    /**
+     * Remove self as an external listener for model events
+     * @param {[type]} subscriber [description]
+     * @param {[type]} namespace [description]
+     * @return {object} model
+     */
+    Model.prototype.unsubscribe = function(subscriber, namespace = '') {
+        this._subscribers = this._subscribers.filter(([sub, ns]) => {
+            return !(ns === namespace && sub === subscriber);
+        });
+
+        return this;
+    };
+
+    // Util to clone object
+    Model.prototype.copy = function(data) {
+        return (typeof data == 'object') ? JSON.parse(JSON.stringify(data)) : data;
+    };
+
+    // Detect change type for a primative
+    Model.prototype.detectChangeType = function(original, updated) {
+        if (typeof updated === 'undefined' && typeof original === 'undefined') return 'REMOVE'; // complete detach
+        if (typeof original === 'undefined') return 'CREATE'; // additional key added to our new data
+        if (typeof updated === 'undefined') return 'REMOVE'; // old key removed from our new data
+        if (original==updated) return 'NONE'; // data unchanged between the two keys
+
+        return 'UPDATE'; // A mix - so an update
+    };
+
+    // Detect objects that are not NULL values
+    Model.prototype.isObject = function(value) {
+        return (typeof value === 'object' && value !== null);
+    };
+
+    // Detect changes in watched data
+    Model.prototype.detectChanges = function(keys, original, updated, namespace = '') {
+        // Detect any changes in the affected data path
+        // (keys is an array starting from the root of the affected location)
+        const next = keys.shift();
+        let returnType = 'UPDATE';
+
+        namespace = namespace ? `${namespace}.${next}` : next;
+
+        // Get values we're comparing
+        original = original ? original[next] : undefined;
+        updated = updated ? updated[next] : undefined;
+
+        // Target key not yet reached, dig on to the next key
+        if (keys.length != 0) {
+            returnType = this.detectChanges(this.copy(keys), original, updated, namespace);
+            // If real change was a create or remove, this parent has been updated, so swap type
+            if (returnType == 'CREATE' || returnType == 'REMOVE') returnType = 'UPDATE';
+        }
+
+        // Target depth reached.
+        if (keys.length == 0) {
+            // Detect attribute changes to children
+            // ie. if you remove an object, its children need to fire remove events
+            if (this.isObject(updated) || this.isObject(original)) {
+                // Check for field changes
+                const fields = new Set([
+                    ...(this.isObject(updated)) ? Object.keys(updated) : [],
+                    ...(this.isObject(original)) ? Object.keys(original) : [],
+                ]);
+
+                const results = [];
+                for (const key of fields) {
+                    results.push(this.detectChanges([key], original, updated, namespace));
+                }
+
+                // Object checks
+                // If both old/new don't exist, these values were detached/removed
+                // If only original doesn't, then we're creating
+                // If only new doesn't, we're removing
+                if (typeof updated === 'undefined' && typeof original === 'undefined') returnType = 'REMOVE';
+                if (typeof original === 'undefined') returnType = 'CREATE';
+                if (typeof updated === 'undefined') returnType = 'REMOVE';
+                if (results.length === 0) returnType = 'NONE'; // Empty
+
+                // If all the sub objects were unchanged, the ob was unchanged.
+                if (results.length !== 0 && results.every(function(val) {
+                    return val == 'NONE';
+                })) {
+                    returnType = 'NONE';
+                }
+            } else {
+                // Else, detect change type on this specific attribute
+                returnType = this.detectChangeType(original, updated);
+            }
+        }
+
+        // Workout wildcard datapath
+        const wildcardNamespace = namespace.substr(0, namespace.lastIndexOf('.')+1) + '*';
+        // reload updated from store so we return proxy instance of objects
+        const updatedData = (typeof updated === 'object') ? this.get(namespace) : updated;
+
+        // Fire change type events
+        switch (returnType) {
+        case 'CREATE':
+            this.trigger('create:'+namespace, updatedData);
+            this.trigger('create:'+wildcardNamespace, updatedData);
+            break;
+        case 'UPDATE':
+            this.trigger('update:'+namespace, updatedData, original);
+            this.trigger('update:'+wildcardNamespace, updatedData, original);
+            break;
+        case 'REMOVE':
+            this.trigger('remove:'+namespace, original);
+            this.trigger('remove:'+wildcardNamespace, original);
+            break;
+        case 'NONE':
+            this.trigger('unchanged:'+namespace, updatedData);
+            break;
+        }
+
+        // Fire general change events, both namspaced and global.
+        if (returnType !== 'NONE') {
+            this.trigger('change:'+namespace, returnType, updated, original);
+            this.trigger('change:'+wildcardNamespace, returnType, updated, original);
+        }
+
+        this.trigger('change', returnType, namespace, updated, original);
+
+        return returnType;
+    };
+
+    // Apply change to original, so new changes can be detected
+    Model.prototype.commitChanges = function(keys, original, updated) {
+        const next = keys.shift();
+        // Insert either at most accurate point, or where original does not yet exist
+        if (keys.length == 0 || !original[next]) {
+            original[next] = this.copy(updated[next]);
+            return;
+        }
+        return this.commitChanges(keys, original[next], updated[next]);
+    };
+
+
+    /**
+     * Proxy access for `get`
+     * @param  {[type]} parent  [description]
+     * @param  {[type]} context [description]
+     * @return {[type]}         [description]
+     */
+    function magicGet(parent, context) {
+        return function(key) {
+            return parent.get(`${context}.${key}`);
+        };
+    }
+
+    /**
+     * Proxy access for `set`
+     * @param  {[type]} parent  [description]
+     * @param  {[type]} context [description]
+     * @return {[type]}         [description]
+     */
+    function magicSet(parent, context) {
+        return function(key, value) {
+            return parent.set(`${context}.${key}`, value);
+        };
+    }
+
+    /**
+     * Proxy access for `on`
+     * @param  {[type]} parent  [description]
+     * @param  {[type]} context [description]
+     * @return {[type]}         [description]
+     */
+    function magicOn(parent, context) {
+        return function(event, callback) {
+            let listener = `${event}:${context}`;
+            // Event may either be purely the event type (change,update)
+            // or type + sub key change:subAttr. In case of sub attr
+            // we want to insert context between the event and the path
+            if (event.includes(':')) {
+                const parts = event.split(':');
+                listener = `${parts[0]}:${context}.${parts[1]}`;
+            }
+            return parent.on(listener, callback);
+        };
+    }
+
+    /**
+     * getContext return datapath to current target.
+     *
+     * @param  {[type]} context [description]
+     * @param  {[type]} prop    [description]
+     * @return {[type]}         [description]
+     */
+    function getContext(context, prop) {
+        return context ? context + '.' + prop : prop;
     }
 
     // Use whitelist to determine if events exist.
@@ -107,17 +584,46 @@
                 this._template = makeTemplate({template: this.template, className: this.className});
             }
 
+            // Init data
+            if (this.data) {
+                // Connect model
+                this._model = new Model(this.data);
+                this.data = this._model.data;
+            }
+
             /* eslint-disable prefer-rest-params */
             this.initialize(...arguments);
             this.connect(config.events);
         };
 
+        /**
+         * setEl Set contents of base el based on Element.
+         *
+         * @param {[type]} el [description]
+         */
+        ComponentImplementation.prototype.setEl = function(el) {
+            this.el.innerHTML = el.innerHTML;
+        };
+
+        /**
+         * Trigger - Trigger an event
+         *
+         * @param  {[type]}    event [description]
+         * @param  {...[type]} args  [description]
+         */
         ComponentImplementation.prototype.trigger = function(event, ...args) {
             for (const i of this._events[event] || []) {
                 // Trigger event (either func or method to call)
                 i[1](...args);
             }
         };
+
+        /**
+         * Add listener
+         * @param  {[type]} key    [description]
+         * @param  {[type]} method [description]
+         * @return {[type]}        [description]
+         */
         ComponentImplementation.prototype.on = function(key, method) {
             // Add a listener
             const split = key.indexOf(' ');
@@ -132,7 +638,7 @@
             // Wrap runner in to method
             const run = (...args) => {
                 if (typeof method === 'function') {
-                    method(...args);
+                    method.apply(this, args);
                 } else {
                     this[method](...args);
                 }
@@ -144,15 +650,10 @@
                 return this;
             }
 
-            // If no target, bind to root el
-            if (!target) {
-                this.el.addEventListener(event, run);
-                (this._events[key] = this._events[key] || []).push([event, run]);
-                return this;
-            }
-
             // Else handle as deligated
             const handler = (e) => {
+                if (!target) return run(e, e.target);
+
                 // e.target was the clicked element
                 if (e.target && e.target.matches(target)) {
                     // If function? run it
@@ -164,50 +665,109 @@
             (this._events[key] = this._events[key] || []).push([event, handler]);
             return this;
         };
+
+        /**
+         * Remove event listener
+         *
+         * @param  {[type]} key [description]
+         * @return {[type]}     [description]
+         */
         ComponentImplementation.prototype.off = function(key) {
             // Remove a listener
             for (const [event, handler] of this._events[key] || []) {
                 this.el.removeEventListener(event, handler);
             }
             delete this._events[key];
+
+            return this;
         };
+
+        /**
+         * Configure events for el
+         *
+         * @param  {[type]} events [description]
+         */
         ComponentImplementation.prototype.connect = function(events) {
             // Create events on new obj, so components don't share
             this._events = [];
+
+            // Add listener to own model
+            if (this._model) {
+                this._model.subscribe(this, 'data');
+                this.on('data:updated', 'render');
+            }
+
             if (!events || typeof events !== 'object') return;
+
             // connected all events
             for (const [key, method] of Object.entries(events)) {
                 this.on(key, method);
             }
         };
+
+        /**
+         * Disconnect all events from el
+         */
         ComponentImplementation.prototype.disconnect = function() {
             // Remove all events
             for (const [key] of Object.entries(this._events)) {
                 this.off(key);
             }
+
+            // Remove listener from own model
+            if (this._model) this._model.unsubscribe(this, 'data');
         };
+
+        /**
+         * Remove this el
+         */
         ComponentImplementation.prototype.destroy = function() {
             this.disconnect();
             if (this.el) this.el.remove();
         };
-        ComponentImplementation.prototype.listenTo = function(model) {
-            if (typeof model.addListener !== 'function') {
+
+        /**
+         * Listen to a model / other component
+         *
+         * @param  {[type]} model     [description]
+         * @param  {String} namespace [description]
+         */
+        ComponentImplementation.prototype.subscribeTo = function(model, namespace = '') {
+            if (typeof model.subscribe !== 'function') {
                 throw new Error('Model does not support listeners');
             }
-            model.addListener(this);
+            model.subscribe(this, namespace);
         };
-        // Placeholders
-        ComponentImplementation.prototype.initialize = function() {};
+
+        /**
+         * Called on boot.
+         * Triggers render by default
+         */
+        ComponentImplementation.prototype.initialize = function() {
+            this.render();
+        };
+
+        /**
+         * render method defines display logic. Normally calls tpl
+         */
         ComponentImplementation.prototype.render = function() {};
 
-        // Template helpers
-        ComponentImplementation.prototype.template = null;
+        /**
+         * Render template defined in template var
+         *
+         * @param  {...[type]} args [description]
+         * @return {[type]}         [description]
+         */
         ComponentImplementation.prototype.tpl = function(...args) {
             if (!this._template) {
                 throw new Error('This component does not implement a template');
             }
             return this._template.render(...args);
         };
+
+        // Extra methods
+        ComponentImplementation.prototype.addEventListener = ComponentImplementation.prototype.on;
+        ComponentImplementation.prototype.removeEventListener = ComponentImplementation.prototype.off;
 
         // Factory features
         this.config = [];
@@ -223,395 +783,26 @@
             definedComponent.config = {...this.config, ...config};
             return definedComponent;
         };
+
+        // Compose component from multiple
+        this.compose = function(...args) {
+            let config = {};
+
+            args.forEach((c)=> {
+                if (c instanceof Component) {
+                    config = {...config, ...c.config};
+                } else if (typeof c === 'object') {
+                    config = {...config, ...c};
+                }
+            });
+
+            const definedComponent = new Component;
+            definedComponent.config = {...this.config, ...config};
+            return definedComponent;
+        };
     };
 
     var Component$1 = new Component;
-
-    /**
-     * Basic model to watch data. Will fire events on changed parts of data tree.
-     *
-     * @param {object} _data - Initial data for model to hold.
-     */
-    const Model = function(_data) {
-        const parent = this;
-        // Cache data access/edit
-        const _cache = new WeakMap();
-        const _original = JSON.parse(JSON.stringify(_data));
-
-        // Eventing
-        this._events = {};
-        this._listeners = [];
-
-        // toggle to bypass magic methods
-        this._ignoreMagicMethods = false;
-
-        // Apply detected changes.
-        this.applyChanges = function(ctx) {
-        // Detect changes to data, fireing events as needed.
-            const change = this.detectChanges(ctx.split('.'), _original, _data);
-            // Update internal data cache to match
-            if (change !== 'NONE') {
-                this.commitChanges(ctx.split('.'), _original, _data);
-                this.trigger('updated');
-            }
-        };
-
-        /**
-         * Create watcher proxy to manage each object in model
-         * Provides access to get,set,on helpers + wraps access in proxies
-         * in order to allow for dynamic change detection
-         *
-         * @param  {object} result  data to wrap in proxy
-         * @param  {string} context datapath to current object
-         * @return {Proxy}          Object wrapped in Proxy
-         */
-        function newProxy(result, context) {
-            const proxyTraps = {
-                get: function(obj, prop, receiver) {
-                    const ctx = context ? context + '.' + prop : prop;
-
-                    // Magic methods are temproarly disabled as part of gets using the
-                    // `get` method, so as to allow datapoints using protected names
-                    // such as get,set,on etc to be accessed directly if needed.
-                    if (!parent._ignoreMagicMethods) {
-                        // Magic methods, as standard these names cannot be used for datapoints
-                        // usless via the get/set methods themselves
-                        if (prop == 'get') {
-                            return function(key) {
-                                return parent.get(`${context}.${key}`);
-                            };
-                        }
-
-                        if (prop == 'set') {
-                            return function(key, value) {
-                                return parent.set(`${context}.${key}`, value);
-                            };
-                        }
-
-                        if (prop == 'on') {
-                            return function(event, callback) {
-                                let listener = `${event}:${context}`;
-                                // Event may either be purely the event type (change,update)
-                                // or type + sub key change:subAttr. In case of sub attr
-                                // we want to insert context between the event and the path
-                                if (event.includes(':')) {
-                                    const parts = event.split(':');
-                                    listener = `${parts[0]}:${context}.${parts[1]}`;
-                                }
-                                return parent.on(listener, callback);
-                            };
-                        }
-
-                        // Get latest version of this object.
-                        // Can happen if old object gets disconnected
-                        if (prop == 'refresh') {
-                            return () => parent.get(context);
-                        }
-
-                        // Get datapath to this object
-                        if (prop == 'context') {
-                            return () => context;
-                        }
-                    }
-
-                    // Normal functionalty - ie. actually getting values
-                    let result = Reflect.get(obj, prop);
-
-                    if (parent.isObject(result)) {
-                        result = newProxy(result, ctx);
-                    }
-
-                    // Trigger read event
-                    parent.trigger('read', ctx);
-                    return result;
-                },
-                set: function(obj, prop, value) {
-                    // Change value & grab context
-                    const success = Reflect.set(obj, prop, value);
-                    const ctx = context ? context + '.' + prop : prop;
-
-                    // Detect changes and fire relevent events
-                    parent.applyChanges(ctx);
-
-                    return success;
-                },
-            };
-            // Config proxy or get from cache
-            const resultProxy = _cache.get(result) || new Proxy(result, proxyTraps);
-            _cache.set(result, resultProxy);
-            return resultProxy;
-        }
-        // Watch changes via proxy
-        this.data = newProxy(_data, '');
-    };
-
-    const jsPathRegex = /([^[.\]])+/g;
-
-    /**
-     * Get value from model
-     *
-     * @param  {string} key      Object path using dot or array notation.
-     * @param  {[type]} fallback [description]
-     * @return {[type]}          [description]
-     */
-    Model.prototype.get = function(key, fallback = undefined) {
-        if (!key) return fallback;
-
-        const keyArray = Array.isArray(key) ? key : key.match(jsPathRegex);
-
-        // Toggle magic methods off to allow get to access `get`,`on` if needed.
-        this._ignoreMagicMethods = true;
-        const result = (
-            keyArray.reduce((prevObj, key) => prevObj && prevObj[key], this.data) || fallback
-        );
-        this._ignoreMagicMethods = false;
-
-        return result;
-    };
-
-    /**
-     * Set value on model
-     * @param {string} key      Object path using dot or array notation.
-     * @param {[type]} value [description]
-     */
-    Model.prototype.set = function(key, value) {
-        // Get key path
-        const keyArray = Array.isArray(key) ? key : key.match(jsPathRegex);
-        // Setup vars
-        let base = this.data;
-        let insert; let insertLocation;
-
-        // Iterate object
-        for (let i = 0; i < keyArray.length; i++ ) {
-            if (i === keyArray.length - 1) {
-                base[keyArray[i]] = value;
-            } else {
-                // If we need to create new objects as we walk the path, we need to
-                // do this in a new object rather than updating the existing tree directly.
-                // This is so that we avoid fireing duplicate update events after each nested
-                // object is added, and instead attach the object all in one go.
-                if (base[keyArray[i]] === undefined) {
-                    // If we start building a new tree, track where we need to reinsert
-                    if (!insertLocation) {
-                        insertLocation = [base, keyArray[i]];
-                        insert = base = {};
-                    }
-                    base[keyArray[i]] = {};
-                }
-
-                // Get next level
-                base = base[keyArray[i]];
-            }
-        }
-
-        // If we've build an external object, inject it into the model again
-        if (insertLocation) {
-            const [location, key] = insertLocation;
-            location[key] = insert[key];
-        }
-    };
-
-    /**
-     * Trigger event on model
-     *
-     * @param  {[type]}    event [description]
-     * @param  {...[type]} args  [description]
-     */
-    Model.prototype.trigger = function(event, ...args) {
-        // Fire own event
-        for (const i of this._events[event] || []) {
-        // Trigger event (either func or method to call)
-            if (typeof i[1] === 'function') {
-                i[1](...args);
-            } else {
-                this[i[1]](...args);
-            }
-        }
-
-        // Fire listeners
-        for (const listener of this._listeners) {
-            listener.trigger(event, ...args);
-        }
-    };
-
-    /**
-     * Listen for event on model
-     * @param  {string} key    Object path using dot or array notation.
-     * @param  {[type]} method [description]
-     * @return {[type]}        [description]
-     */
-    Model.prototype.on = function(key, method) {
-        (this._events[key] = this._events[key] || []).push([key, method]);
-        return this;
-    };
-
-    /**
-     * Remove event listener
-     * @param  {string} key    Object path using dot or array notation.
-     * @param  {[type]} method [description]
-     * @return {[type]}        [description]
-     */
-    Model.prototype.off = function(key, method) {
-        if (!this._events[key]) return this;
-
-        // Delete all listners if no method
-        if (!method) {
-            delete this._events[key];
-            return this;
-        }
-        // Else only one with method
-        for (const evt in this._events[key]) {
-            if (this._events[key][evt][1] == method) {
-                this._events[key].splice(evt, 1);
-            }
-        }
-
-        return this;
-    };
-
-    /**
-     * Register self as an external listener for model events
-     * @param {[type]} listener [description]
-     * @return {object} model
-     */
-    Model.prototype.addListener = function(listener) {
-        if (typeof listener.trigger !== 'function') {
-            throw new Error('Unsupported listener type provided. Must implement trigger method.');
-        }
-        this._listeners.push(listener);
-        return this;
-    };
-    /**
-     * Remove self as an external listener for model events
-     * @param {[type]} listener [description]
-     * @return {object} model
-     */
-    Model.prototype.removeListener = function(listener) {
-        const idx = this._listeners.indexOf(listener);
-        if (idx !== -1) {
-            this._listeners.splice(this._listeners.indexOf(listener), 1);
-        }
-        return this;
-    };
-
-    // Util to clone object
-    Model.prototype.copy = function(data) {
-        return (typeof data == 'object') ? JSON.parse(JSON.stringify(data)) : data;
-    };
-
-    // Detect change type for a primative
-    Model.prototype.detectChangeType = function(original, updated) {
-        if (typeof updated === 'undefined' && typeof original === 'undefined') return 'REMOVE'; // complete detach
-        if (typeof original === 'undefined') return 'CREATE'; // additional key added to our new data
-        if (typeof updated === 'undefined') return 'REMOVE'; // old key removed from our new data
-        if (original==updated) return 'NONE'; // data unchanged between the two keys
-
-        return 'UPDATE'; // A mix - so an update
-    };
-
-    // Detect objects that are not NULL values
-    Model.prototype.isObject = function(value) {
-        return (typeof value === 'object' && value !== null);
-    };
-
-    // Detect changes in watched data
-    Model.prototype.detectChanges = function(keys, original, updated, namespace = '') {
-        // Detect any changes in the affected data path
-        // (keys is an array starting from the root of the affected location)
-        const next = keys.shift();
-        let returnType = 'UPDATE';
-
-        namespace = namespace ? `${namespace}.${next}` : next;
-
-        // Get values we're comparing
-        original = original ? original[next] : undefined;
-        updated = updated ? updated[next] : undefined;
-
-        // Target key not yet reached, dig on to the next key
-        if (keys.length != 0) {
-            returnType = this.detectChanges(this.copy(keys), original, updated, namespace);
-            // If real change was a create or remove, this parent has been updated, so swap type
-            if (returnType == 'CREATE' || returnType == 'REMOVE') returnType = 'UPDATE';
-        }
-
-        // Target depth reached.
-        if (keys.length == 0) {
-        // Detect attribute changes to children
-        // ie. if you remove an object, its children need to fire remove events
-            if (this.isObject(updated) || this.isObject(original)) {
-                // Check for field changes
-                const fields = new Set([
-                    ...(this.isObject(updated)) ? Object.keys(updated) : [],
-                    ...(this.isObject(original)) ? Object.keys(original) : [],
-                ]);
-
-                const results = [];
-                for (const key of fields) {
-                    results.push(this.detectChanges([key], original, updated, namespace));
-                }
-
-                // Object checks
-                // If both old/new don't exist, these values were detached/removed
-                // If only original doesn't, then we're creating
-                // If only new doesn't, we're removing
-                if (typeof updated === 'undefined' && typeof original === 'undefined') returnType = 'REMOVE';
-                if (typeof original === 'undefined') returnType = 'CREATE';
-                if (typeof updated === 'undefined') returnType = 'REMOVE';
-                if (results.length === 0) returnType = 'NONE'; // Empty
-
-                // If all the sub objects were unchanged, the ob was unchanged.
-                if (results.length !== 0 && results.every(function(val) {
-                    return val == 'NONE';
-                })) {
-                    returnType = 'NONE';
-                }
-            } else {
-                // Else, detect change type on this specific attribute
-                returnType = this.detectChangeType(original, updated);
-            }
-        }
-
-        // Workout wildcard datapath
-        const wildcardNamespace = namespace.substr(0, namespace.lastIndexOf('.')+1) + '*';
-        // reload updated from store so we return proxy instance of objects
-        const updatedData = (typeof updated === 'object') ? this.get(namespace) : updated;
-
-        // Fire change type events
-        switch (returnType) {
-        case 'CREATE':
-            this.trigger('create:'+wildcardNamespace, updatedData);
-            this.trigger('create:'+namespace, updatedData);
-            break;
-        case 'UPDATE':
-            this.trigger('update:'+wildcardNamespace, updatedData, original);
-            this.trigger('update:'+namespace, updatedData, original);
-            break;
-        case 'REMOVE':
-            this.trigger('remove:'+wildcardNamespace, original);
-            this.trigger('remove:'+namespace, original);
-            break;
-        case 'NONE':
-            this.trigger('unchanged:'+namespace, updatedData);
-            break;
-        }
-
-        // Fire general change events, both namspaced and global.
-        this.trigger('change:'+namespace, returnType, updated, original);
-        this.trigger('change', returnType, namespace, updated, original);
-
-        return returnType;
-    };
-
-    // Apply change to original, so new changes can be detected
-    Model.prototype.commitChanges = function(keys, original, updated) {
-        const next = keys.shift();
-        // Insert either at most accurate point, or where original does not yet exist
-        if (keys.length == 0 || !original[next]) {
-            original[next] = this.copy(updated[next]);
-            return;
-        }
-        return this.commitChanges(keys, original[next], updated[next]);
-    };
 
     var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -18080,7 +18271,7 @@
         },
         characterDblClick: function(event) {
             event.preventDefault;
-            EditMobModal.make({target: this.ref.refresh()});
+            EditMobModal.make({target: this.ref});
         },
         characterDragStart: function(event) {
             // Disable transition effect when we're dragging
@@ -18090,7 +18281,6 @@
             const latLng = event.target.getLatLng();
             event.target._icon.classList.remove('prevent-animation');
             // Sync
-            this.ref = this.ref.refresh();
             this.ref.x = latLng.lat;
             this.ref.y = latLng.lng;
         },
@@ -18100,13 +18290,11 @@
             ConfirmModal.make({
                 question: 'Remove character from map?',
                 callback: () => {
-                    this.ref.refresh().spawned = false;
+                    this.ref.spawned = false;
                 },
             });
         },
         render: function() {
-            this.ref = this.ref.refresh();
-
             // Sync spawned?
             if (!this.ref.spawned || this.ref.removed) {
                 this.marker.remove();
@@ -18155,7 +18343,7 @@
             this.map.on('contextmenu', (e) => this.trigger('map:contextmenu', e));
 
             // Listen to model
-            this.listenTo(config.state);
+            this.subscribeTo(config.state);
 
             // Pass model eventing
             this.render();
@@ -18174,7 +18362,7 @@
             'update:fog.enabled': 'fogToggled',
             'update:fog.opacity': 'fogOpacityChanged',
         },
-        fogMaskUpdated: function(mask){
+        fogMaskUpdated: function(mask) {
             // Import new mask
             this.fog.initFog(JSON.parse(mask));
             // Redraw fog only when change has been detected.
@@ -18218,11 +18406,12 @@
             this.fog.addFog(e.latlng, this.options.get('fog.clearSize'));
             this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
         },
-        fogRefresh: function(){
+        fogRefresh: function() {
             this.fog.initFog(JSON.parse(this.options.get('fog.mask')));
         },
         // Render changes
         render: function() {
+
             // Reload save data
             // Load config from settings
             if (!this.options.get('fog.mask')) {
@@ -18236,6 +18425,7 @@
 
             // Boot players
             for (const player of Object.values(this.options.get('players'))) {
+
                 this.spawnPlayer(player);
             }
             // Boot spawns
@@ -18306,7 +18496,6 @@
     var NewPlayerModal = BaseMobModal.define({
         // Setup
         initialize: function(options) {
-            console.log(options);
             this.players = options.players;
 
             // Render base template
@@ -18322,7 +18511,7 @@
         },
         // Save data to target
         save: function(e, target) {
-            this.players = this.players.refresh();
+            this.players = this.players;
             this.players.push({
                 name: this.el.querySelector('input[type=text]').value,
                 icon: this.el.querySelector('img').dataset.id,
@@ -18339,7 +18528,6 @@
         initialize: function(config) {
             // Config player bar.
             this.el.id = 'player-bar';
-
             this.players = config.players;
             this.players.on('create:*', (e) => this.trigger('player:added', e));
 
@@ -18359,13 +18547,13 @@
         `;
         },
         onEdit: function(e, target) {
-            const player = playerMap.get(target).refresh();
+            const player = playerMap.get(target);
             EditMobModal.make({target: player});
         },
         onRemove: function(e, target) {
             e.preventDefault();
 
-            const player = playerMap.get(target).refresh();
+            const player = playerMap.get(target);
             ConfirmModal.make({
                 question: 'Remove player from lineup?',
                 callback: () => {
@@ -18377,7 +18565,7 @@
             NewPlayerModal.make({players: this.players});
         },
         onPlayerSelect: function(e, target) {
-            const player = playerMap.get(target).refresh();
+            const player = playerMap.get(target);
 
             // Spawn em to map if we want em
             if (!player.spawned) {
@@ -18434,6 +18622,8 @@
             });
         },
         render: async function() {
+
+            console.log(this.players);
             this.players.map((player) => {
                 this.makePlayerCard(player);
             });
@@ -18494,13 +18684,13 @@
         },
         // Actions
         toggleFog: function(e, target) {
-            this.fogProps.refresh().enabled = target.checked;
+            this.fogProps.enabled = target.checked;
         },
         changeOpacity: function(e, target) {
-            this.fogProps.refresh().opacity = target.value;
+            this.fogProps.opacity = target.value;
         },
         changeClearSize: function(e, target) {
-            this.fogProps.refresh().clearSize = target.value;
+            this.fogProps.clearSize = target.value;
         },
         toggle: function() {
             this.prop.visible = !this.prop.visible;
@@ -18709,7 +18899,7 @@
             ImagePicker$1.make({target});
         },
         save: function(e, target) {
-            this.spawns = this.spawns.refresh();
+            this.spawns = this.spawns;
             this.spawns.push({
                 name: this.el.querySelector('input[type=text]').value,
                 icon: this.el.querySelector('img').dataset.id,

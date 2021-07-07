@@ -38,7 +38,6 @@ export default Component.define({
         ImagePicker.make({target});
     },
     save: function(e, target) {
-        this.spawns = this.spawns.refresh();
         this.spawns.push({
             name: this.el.querySelector('input[type=text]').value,
             icon: this.el.querySelector('img').dataset.id,

@@ -12,7 +12,6 @@ export default Component.define({
     initialize: function(config) {
         // Config player bar.
         this.el.id = 'player-bar';
-
         this.players = config.players;
         this.players.on('create:*', (e) => this.trigger('player:added', e));
 
@@ -32,13 +31,13 @@ export default Component.define({
         `;
     },
     onEdit: function(e, target) {
-        const player = playerMap.get(target).refresh();
+        const player = playerMap.get(target);
         EditMobModal.make({target: player});
     },
     onRemove: function(e, target) {
         e.preventDefault();
 
-        const player = playerMap.get(target).refresh();
+        const player = playerMap.get(target);
         ConfirmModal.make({
             question: 'Remove player from lineup?',
             callback: () => {
@@ -50,7 +49,7 @@ export default Component.define({
         NewPlayerModal.make({players: this.players});
     },
     onPlayerSelect: function(e, target) {
-        const player = playerMap.get(target).refresh();
+        const player = playerMap.get(target);
 
         // Spawn em to map if we want em
         if (!player.spawned) {
@@ -107,6 +106,7 @@ export default Component.define({
         });
     },
     render: async function() {
+        console.log(this.players);
         this.players.map((player) => {
             this.makePlayerCard(player);
         });

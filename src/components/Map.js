@@ -30,7 +30,7 @@ export default Component.define({
         this.map.on('contextmenu', (e) => this.trigger('map:contextmenu', e));
 
         // Listen to model
-        this.listenTo(config.state);
+        this.subscribeTo(config.state);
 
         // Pass model eventing
         this.render();

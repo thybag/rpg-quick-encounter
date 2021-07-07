@@ -80,7 +80,7 @@ export default Component.define({
     },
     characterDblClick: function(event) {
         event.preventDefault;
-        EditMobModal.make({target: this.ref.refresh()});
+        EditMobModal.make({target: this.ref});
     },
     characterDragStart: function(event) {
         // Disable transition effect when we're dragging
@@ -90,7 +90,6 @@ export default Component.define({
         const latLng = event.target.getLatLng();
         event.target._icon.classList.remove('prevent-animation');
         // Sync
-        this.ref = this.ref.refresh();
         this.ref.x = latLng.lat;
         this.ref.y = latLng.lng;
     },
@@ -100,13 +99,11 @@ export default Component.define({
         ConfirmModal.make({
             question: 'Remove character from map?',
             callback: () => {
-                this.ref.refresh().spawned = false;
+                this.ref.spawned = false;
             },
         });
     },
     render: function() {
-        this.ref = this.ref.refresh();
-
         // Sync spawned?
         if (!this.ref.spawned || this.ref.removed) {
             this.marker.remove();

@@ -49,13 +49,13 @@ export default Component.define({
     },
     // Actions
     toggleFog: function(e, target) {
-        this.fogProps.refresh().enabled = target.checked;
+        this.fogProps.enabled = target.checked;
     },
     changeOpacity: function(e, target) {
-        this.fogProps.refresh().opacity = target.value;
+        this.fogProps.opacity = target.value;
     },
     changeClearSize: function(e, target) {
-        this.fogProps.refresh().clearSize = target.value;
+        this.fogProps.clearSize = target.value;
     },
     toggle: function() {
         this.prop.visible = !this.prop.visible;

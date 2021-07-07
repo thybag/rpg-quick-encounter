@@ -4,7 +4,6 @@ import {getRandomPlayerIcon} from '../../utils/getIconImage.js';
 export default BaseMobModal.define({
     // Setup
     initialize: function(options) {
-        console.log(options);
         this.players = options.players;
 
         // Render base template
@@ -20,7 +19,6 @@ export default BaseMobModal.define({
     },
     // Save data to target
     save: function(e, target) {
-        this.players = this.players.refresh();
         this.players.push({
             name: this.el.querySelector('input[type=text]').value,
             icon: this.el.querySelector('img').dataset.id,
