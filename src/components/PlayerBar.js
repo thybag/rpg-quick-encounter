@@ -106,7 +106,6 @@ export default Component.define({
         });
     },
     render: async function() {
-        console.log(this.players);
         this.players.map((player) => {
             this.makePlayerCard(player);
         });

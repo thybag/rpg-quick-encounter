@@ -15044,31 +15044,6 @@
     }
 
     /**
-     * Get Geometry from Feature or Geometry Object
-     *
-     * @param {Feature|Geometry} geojson GeoJSON Feature or Geometry Object
-     * @returns {Geometry|null} GeoJSON Geometry Object
-     * @throws {Error} if geojson is not a Feature or Geometry Object
-     * @example
-     * var point = {
-     *   "type": "Feature",
-     *   "properties": {},
-     *   "geometry": {
-     *     "type": "Point",
-     *     "coordinates": [110, 40]
-     *   }
-     * }
-     * var geom = turf.getGeom(point)
-     * //={"type": "Point", "coordinates": [110, 40]}
-     */
-    function getGeom(geojson) {
-        if (geojson.type === "Feature") {
-            return geojson.geometry;
-        }
-        return geojson;
-    }
-
-    /**
      * splaytree v3.1.0
      * Fast Splay tree for Node and browser
      *
@@ -17496,6 +17471,31 @@
     };
 
     /**
+     * Get Geometry from Feature or Geometry Object
+     *
+     * @param {Feature|Geometry} geojson GeoJSON Feature or Geometry Object
+     * @returns {Geometry|null} GeoJSON Geometry Object
+     * @throws {Error} if geojson is not a Feature or Geometry Object
+     * @example
+     * var point = {
+     *   "type": "Feature",
+     *   "properties": {},
+     *   "geometry": {
+     *     "type": "Point",
+     *     "coordinates": [110, 40]
+     *   }
+     * }
+     * var geom = turf.getGeom(point)
+     * //={"type": "Point", "coordinates": [110, 40]}
+     */
+    function getGeom(geojson) {
+        if (geojson.type === "Feature") {
+            return geojson.geometry;
+        }
+        return geojson;
+    }
+
+    /**
      * Finds the difference between two {@link Polygon|polygons} by clipping the second polygon from the first.
      *
      * @name difference
@@ -18219,9 +18219,9 @@
         map: null,
         // Events
         events: {
-            'marker:click': 'characterClick',
+            'marker:click': 'bringToFront',
             'marker:dblclick': 'characterDblClick',
-            'marker:dragstart': 'characterDragStart',
+            'marker:dragstart': 'bringToFront',
             'marker:dragend': 'characterDragend',
             'marker:contextmenu': 'characterRemove',
             'data:change': 'render',
@@ -18248,6 +18248,10 @@
             this.marker.on('dragend', (e) => this.trigger('marker:dragend', e));
             this.marker.on('contextmenu', (e) => this.trigger('marker:contextmenu', e));
 
+            this.map.on('zoom', (e) => this.trigger('marker:zoom', e));
+            this.map.on('zoomend', (e) => this.trigger('marker:zoomend', e));
+            this.map.on('zoomstart', (e) => this.trigger('marker:zoomstart', e));
+
             this.ref.on('update', (e) => this.trigger('data:change', e));
 
             // Make icon
@@ -18262,9 +18266,9 @@
         panTo: function() {
             this.map.panTo(this.marker.getLatLng());
         },
-        characterClick: function(event) {
+        bringToFront: function(event) {
             event.preventDefault;
-
+            console.log("f");
             // Bring character to the front
             globalZIndexOffset++;
             this.marker.setZIndexOffset(globalZIndexOffset*1000);
@@ -18273,13 +18277,8 @@
             event.preventDefault;
             EditMobModal.make({target: this.ref});
         },
-        characterDragStart: function(event) {
-            // Disable transition effect when we're dragging
-            event.target._icon.classList.add('prevent-animation');
-        },
         characterDragend: function(event) {
             const latLng = event.target.getLatLng();
-            event.target._icon.classList.remove('prevent-animation');
             // Sync
             this.ref.x = latLng.lat;
             this.ref.y = latLng.lng;
@@ -18411,7 +18410,6 @@
         },
         // Render changes
         render: function() {
-
             // Reload save data
             // Load config from settings
             if (!this.options.get('fog.mask')) {
@@ -18425,7 +18423,6 @@
 
             // Boot players
             for (const player of Object.values(this.options.get('players'))) {
-
                 this.spawnPlayer(player);
             }
             // Boot spawns
@@ -18511,7 +18508,6 @@
         },
         // Save data to target
         save: function(e, target) {
-            this.players = this.players;
             this.players.push({
                 name: this.el.querySelector('input[type=text]').value,
                 icon: this.el.querySelector('img').dataset.id,
@@ -18622,8 +18618,6 @@
             });
         },
         render: async function() {
-
-            console.log(this.players);
             this.players.map((player) => {
                 this.makePlayerCard(player);
             });
@@ -18891,15 +18885,21 @@
         prop: {
             visible: false,
         },
+        // Save via keyboard
+        detectSubmit: function(e) {
+            if (e.key == 'Enter' || e.keyCode == 13) {
+                this.save();
+            }
+        },
         events: {
             'click img': 'openPickList',
             'click input[type=submit]': 'save',
+            'keyup input[type=text]': 'detectSubmit'
         },
         openPickList: function(e, target) {
             ImagePicker$1.make({target});
         },
         save: function(e, target) {
-            this.spawns = this.spawns;
             this.spawns.push({
                 name: this.el.querySelector('input[type=text]').value,
                 icon: this.el.querySelector('img').dataset.id,
@@ -18925,8 +18925,6 @@
             } else {
                 this.el.style.display = 'none';
             }
-
-            this.el.querySelector('[type=submit]').value = 'Spawn';
         },
     });
 
@@ -19360,7 +19358,7 @@
                 <img src="${map.map}" loading="lazy" />
                 <div>
                     Map: <span>${map.map}</span> <br/>
-                    Players: ${map.players.length}, Mobs: ${map.spawns.length} <br/>
+                    Players: ${map?.players?.length}, Mobs: ${map?.spawns?.length} <br/>
                     Last played: ${map['data:updated'] ? new Date(map['data:updated']).toLocaleString() :'-'}
                 </div>
                 <div class='play'>

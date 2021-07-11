@@ -28,9 +28,9 @@ export default Component.define({
     map: null,
     // Events
     events: {
-        'marker:click': 'characterClick',
+        'marker:click': 'bringToFront',
         'marker:dblclick': 'characterDblClick',
-        'marker:dragstart': 'characterDragStart',
+        'marker:dragstart': 'bringToFront',
         'marker:dragend': 'characterDragend',
         'marker:contextmenu': 'characterRemove',
         'data:change': 'render',
@@ -57,6 +57,10 @@ export default Component.define({
         this.marker.on('dragend', (e) => this.trigger('marker:dragend', e));
         this.marker.on('contextmenu', (e) => this.trigger('marker:contextmenu', e));
 
+        this.map.on('zoom', (e) => this.trigger('marker:zoom', e));
+        this.map.on('zoomend', (e) => this.trigger('marker:zoomend', e));
+        this.map.on('zoomstart', (e) => this.trigger('marker:zoomstart', e));
+
         this.ref.on('update', (e) => this.trigger('data:change', e));
 
         // Make icon
@@ -71,9 +75,9 @@ export default Component.define({
     panTo: function() {
         this.map.panTo(this.marker.getLatLng());
     },
-    characterClick: function(event) {
+    bringToFront: function(event) {
         event.preventDefault;
-
+        console.log('f');
         // Bring character to the front
         globalZIndexOffset++;
         this.marker.setZIndexOffset(globalZIndexOffset*1000);
@@ -82,13 +86,8 @@ export default Component.define({
         event.preventDefault;
         EditMobModal.make({target: this.ref});
     },
-    characterDragStart: function(event) {
-        // Disable transition effect when we're dragging
-        event.target._icon.classList.add('prevent-animation');
-    },
     characterDragend: function(event) {
         const latLng = event.target.getLatLng();
-        event.target._icon.classList.remove('prevent-animation');
         // Sync
         this.ref.x = latLng.lat;
         this.ref.y = latLng.lng;

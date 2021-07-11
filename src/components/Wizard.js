@@ -18,7 +18,7 @@ const savesTlp = new Template({
                 <img src="${map.map}" loading="lazy" />
                 <div>
                     Map: <span>${map.map}</span> <br/>
-                    Players: ${map.players.length}, Mobs: ${map.spawns.length} <br/>
+                    Players: ${map?.players?.length}, Mobs: ${map?.spawns?.length} <br/>
                     Last played: ${map['data:updated'] ? new Date(map['data:updated']).toLocaleString() :'-'}
                 </div>
                 <div class='play'>

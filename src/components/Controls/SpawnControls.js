@@ -30,9 +30,16 @@ export default Component.define({
     prop: {
         visible: false,
     },
+    // Save via keyboard
+    detectSubmit: function(e) {
+        if (e.key == 'Enter' || e.keyCode == 13) {
+            this.save();
+        }
+    },
     events: {
         'click img': 'openPickList',
         'click input[type=submit]': 'save',
+        'keyup input[type=text]': 'detectSubmit',
     },
     openPickList: function(e, target) {
         ImagePicker.make({target});
@@ -63,7 +70,5 @@ export default Component.define({
         } else {
             this.el.style.display = 'none';
         }
-
-        this.el.querySelector('[type=submit]').value = 'Spawn';
     },
 });

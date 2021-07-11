@@ -60,9 +60,10 @@ input[type=submit]:hover, button:hover {
   text-align: center;
 }
 #map .leaflet-marker-draggable {
-  transition: transform 0.3s ease 0s;
+  transition: transform 0.25s cubic-bezier(0, 0, 0.25, 1);
 }
-#map .leaflet-marker-draggable.prevent-animation {
+
+.leaflet-dragging #map .leaflet-marker-draggable {
   transition: none;
 }
 

@@ -1,4 +1,6 @@
-import * as turf from '@turf/turf';
+import {multiPolygon, polygon} from '@turf/helpers';
+import difference from '@turf/difference';
+import union from '@turf/union';
 
 /**
  * Convert multi polygon geojson to array of lat/lng pairs
@@ -39,9 +41,9 @@ export default new function() {
             this.cutouts = [poly];
             return this.cutouts;
         }
-        const cutoutPoly = turf.multiPolygon(this.cutouts);
-        const newPoly = turf.polygon([poly]);
-        const u = turf.union(cutoutPoly, newPoly);
+        const cutoutPoly = multiPolygon(this.cutouts);
+        const newPoly = polygon([poly]);
+        const u = union(cutoutPoly, newPoly);
 
         this.cutouts = u.geometry.coordinates;
 
@@ -49,10 +51,10 @@ export default new function() {
     };
 
     this.removeCutOut = function(poly) {
-        const cutoutPoly = turf.multiPolygon(this.cutouts);
-        const newPoly = turf.polygon([poly]);
+        const cutoutPoly = multiPolygon(this.cutouts);
+        const newPoly = polygon([poly]);
 
-        const u = turf.difference(cutoutPoly, newPoly);
+        const u = difference(cutoutPoly, newPoly);
 
         // Handle null if no difference found (ie. we cleared it all)
         if (!u) {
