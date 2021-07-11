@@ -59,6 +59,9 @@ input[type=submit]:hover, button:hover {
   border: solid 2px;
   text-align: center;
 }
+#map .character-icon span:empty {
+  display: none;
+}
 #map .leaflet-marker-draggable {
   transition: transform 0.25s cubic-bezier(0, 0, 0.25, 1);
 }

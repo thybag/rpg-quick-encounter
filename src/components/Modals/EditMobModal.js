@@ -13,6 +13,7 @@ export default BaseMobModal.define({
 
         // Create self on the global level as needed.
         document.body.appendChild(this.el);
+        this.focus();
     },
     // Save data to target
     save: function(e, target) {

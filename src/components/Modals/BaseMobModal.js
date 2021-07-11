@@ -7,7 +7,7 @@ export default Component.define({
     className: 'modal',
     template: (title, name, icon) => {
         return `
-            <div class='spawn-controls'>
+            <div class='spawn-controls' aria-modal="true" role="dialog">
                 <h2>${title}</h2>
                 <img src="${getIconImage(icon)}" data-id="${icon}">
                 <div>
@@ -38,5 +38,12 @@ export default Component.define({
     // Open image picker
     openPickList: function(e, target) {
         ImagePicker.make({target});
+    },
+    focus: function(e) {
+        // Set focus to input
+        const input = this.el.querySelector('input[type=text]');
+        // Ensure selection is the end of the current value
+        input.selectionStart = input.selectionEnd = input.value.length;
+        input.focus();
     },
 });

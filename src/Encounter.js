@@ -55,25 +55,37 @@ export default Component.define({
         const players = Players.make({el: playerEl, players: mapState.get('players')});
         Controls.make({el: controlEl, state: mapState});
 
-        // Listen for local storage being changed on this map
-        localData.listen(setup.data.map, function(updated) {
-            // update ourselves to match if so.
-            mapState.set('spawns', updated.spawns);
-            mapState.set('fog', updated.fog);
-            mapState.set('players', updated.players);
-        });
-
-        // Save changes automatically.
-        mapState.on('updated', debounce(
-            () => {
-                // Avoid unneeded saves
-                localData.saveMap(mapState.get('map'), mapState.data);
-            }, 50),
-        );
+        this.initSync(mapState);
 
         /* to refactor */
         players.on('map:player:focus', function(player) {
             map.trigger('map:player:focus', player);
+        });
+    },
+    initSync: function(mapState) {
+        const map = mapState.get('map');
+        let sync = true;
+
+        // Listen for local storage being changed on this map
+        localData.listen(map, function(updated) {
+            // disable sync while changes are applied.
+            sync = false;
+            // update ourselves to match if so.
+            mapState.set('spawns', updated.spawns);
+            mapState.set('fog', updated.fog);
+            mapState.set('players', updated.players);
+            sync = true;
+        });
+
+        // commit changes to local storage
+        const commitChanges = debounce(() => {
+            // Avoid unneeded saves
+            localData.saveMap(map, mapState.data);
+        }, 50);
+
+        // Commit changes if sync is enabled at time change is applied.
+        mapState.on('updated', () => {
+            if (sync) commitChanges();
         });
     },
 });

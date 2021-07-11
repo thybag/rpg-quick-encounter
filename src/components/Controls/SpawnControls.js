@@ -22,24 +22,24 @@ export default Component.define({
             <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
             <div>
                 <label>Name</label>
-                <input type="text" value="Unknown">
+                <input type="text" value="">
                 <input type='submit' value="Spawn">
             </div>
         `;
     },
-    prop: {
+    data: {
         visible: false,
+    },
+    events: {
+        'click img': 'openPickList',
+        'click input[type=submit]': 'save',
+        'keyup input[type=text]': 'detectSubmit',
     },
     // Save via keyboard
     detectSubmit: function(e) {
         if (e.key == 'Enter' || e.keyCode == 13) {
             this.save();
         }
-    },
-    events: {
-        'click img': 'openPickList',
-        'click input[type=submit]': 'save',
-        'keyup input[type=text]': 'detectSubmit',
     },
     openPickList: function(e, target) {
         ImagePicker.make({target});
@@ -51,24 +51,16 @@ export default Component.define({
             id: this.spawnslength,
             spawned: true,
         });
+        this.focus();
     },
     toggle: function() {
-        this.prop.visible ? this.hide() : this.show();
+        this.data.visible = !this.data.visible;
     },
-    show: function(mode = 'spawn') {
-        this.prop.visible = true;
-        this.prop.mode = mode;
-        this.render();
+    render: function() {
+        this.el.style.display = (this.data.visible) ? 'block' : 'none';
+        this.focus();
     },
-    hide: function() {
-        this.prop.visible = false;
-        this.render();
-    },
-    render: async function() {
-        if (this.prop.visible) {
-            this.el.style.display = 'block';
-        } else {
-            this.el.style.display = 'none';
-        }
+    focus: function() {
+        if (this.data.visible) this.el.querySelector('input[type=text]').focus();
     },
 });

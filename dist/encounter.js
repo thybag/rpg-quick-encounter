@@ -18096,7 +18096,7 @@
         className: 'modal',
         template: (title, name, icon) => {
             return `
-            <div class='spawn-controls'>
+            <div class='spawn-controls' aria-modal="true" role="dialog">
                 <h2>${title}</h2>
                 <img src="${getIconImage(icon)}" data-id="${icon}">
                 <div>
@@ -18128,6 +18128,13 @@
         openPickList: function(e, target) {
             ImagePicker$2.make({target});
         },
+        focus: function(e) {
+            // Set focus to input 
+            const input = this.el.querySelector('input[type=text]');
+            // Ensure selection is the end of the current value
+            input.selectionStart = input.selectionEnd = input.value.length;
+            input.focus();
+        }
     });
 
     var EditMobModal = BaseMobModal.define({
@@ -18143,6 +18150,7 @@
 
             // Create self on the global level as needed.
             document.body.appendChild(this.el);
+            this.focus();
         },
         // Save data to target
         save: function(e, target) {
@@ -18504,6 +18512,7 @@
 
             // Create self on the global level as needed.
             document.body.appendChild(this.el);
+            this.focus();
         },
         // Save data to target
         save: function(e, target) {
@@ -18876,24 +18885,24 @@
             <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
             <div>
                 <label>Name</label>
-                <input type="text" value="Unknown">
+                <input type="text" value="">
                 <input type='submit' value="Spawn">
             </div>
         `;
         },
-        prop: {
+        data: {
             visible: false,
+        },
+        events: {
+            'click img': 'openPickList',
+            'click input[type=submit]': 'save',
+            'keyup input[type=text]': 'detectSubmit',
         },
         // Save via keyboard
         detectSubmit: function(e) {
             if (e.key == 'Enter' || e.keyCode == 13) {
                 this.save();
             }
-        },
-        events: {
-            'click img': 'openPickList',
-            'click input[type=submit]': 'save',
-            'keyup input[type=text]': 'detectSubmit',
         },
         openPickList: function(e, target) {
             ImagePicker$1.make({target});
@@ -18905,26 +18914,18 @@
                 id: this.spawnslength,
                 spawned: true,
             });
+            this.focus();
         },
         toggle: function() {
-            this.prop.visible ? this.hide() : this.show();
+            this.data.visible = !this.data.visible;
         },
-        show: function(mode = 'spawn') {
-            this.prop.visible = true;
-            this.prop.mode = mode;
-            this.render();
+        render: function() {
+            this.el.style.display = (this.data.visible) ? 'block' : 'none';
+            this.focus();
         },
-        hide: function() {
-            this.prop.visible = false;
-            this.render();
-        },
-        render: async function() {
-            if (this.prop.visible) {
-                this.el.style.display = 'block';
-            } else {
-                this.el.style.display = 'none';
-            }
-        },
+        focus: function(){
+            if (this.data.visible) this.el.querySelector('input[type=text]').focus();
+        }
     });
 
     var Controls = Component$1.define({
@@ -19091,27 +19092,39 @@
             const players = Players.make({el: playerEl, players: mapState.get('players')});
             Controls.make({el: controlEl, state: mapState});
 
-            // Listen for local storage being changed on this map
-            localData.listen(setup.data.map, function(updated) {
-                // update ourselves to match if so.
-                mapState.set('spawns', updated.spawns);
-                mapState.set('fog', updated.fog);
-                mapState.set('players', updated.players);
-            });
-
-            // Save changes automatically.
-            mapState.on('updated', debounce(
-                () => {
-                    // Avoid unneeded saves
-                    localData.saveMap(mapState.get('map'), mapState.data);
-                }, 50),
-            );
-
+            this.initSync(mapState);
+     
             /* to refactor */
             players.on('map:player:focus', function(player) {
                 map.trigger('map:player:focus', player);
             });
         },
+        initSync: function(mapState){
+            const map = mapState.get('map');
+            let sync = true;
+            
+            // Listen for local storage being changed on this map
+            localData.listen(map, function(updated) {
+                // disable sync while changes are applied.
+                sync = false;
+                // update ourselves to match if so.
+                mapState.set('spawns', updated.spawns);
+                mapState.set('fog', updated.fog);
+                mapState.set('players', updated.players);
+                sync = true;
+            });
+
+            // commit changes to local storage
+            const commitChanges = debounce(() => {
+                // Avoid unneeded saves
+                localData.saveMap(map, mapState.data);
+            }, 50);
+
+            // Commit changes if sync is enabled at time change is applied.
+            mapState.on('updated', () => {
+                if(sync) commitChanges();
+            });
+        }
     });
 
     const iconList = new Template({

@@ -19,6 +19,9 @@
           border: solid 2px;
           text-align:center;
         }
+        span:empty {
+            display:none;
+        }
     }
 
     /* Drag behaviors */
