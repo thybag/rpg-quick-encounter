@@ -1,0 +1,35 @@
+/* Fog controls */
+.fog-controls {
+	position: absolute;
+	width: 400px;
+	font-size:0.9rem;
+	right: 1rem;
+	bottom: calc(40px + 1rem);
+    z-index: 1010;
+    background: #fff;
+
+    h2 {
+        @include modal-h2;
+    }
+
+    div {
+        padding: 2rem;
+        padding-top: 0;
+
+        label {
+            padding:1rem;
+
+            span:first-child {
+                display:block;
+                margin-bottom:.5rem;
+            }
+            input[type=range] {
+                width:90%;
+                margin:0;
+            }
+        }
+        .toggle {
+            @include toggle;
+        }
+    }
+}

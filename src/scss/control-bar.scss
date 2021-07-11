@@ -1,0 +1,26 @@
+#control-bar {
+	height:40px;
+	width:100vw;
+	background: $primary;
+	box-shadow: 0 -5px 5px -2px #444;
+	position: relative;
+	z-index: 990;
+	box-sizing: border-box;
+    display:fixed;
+
+    span, a {
+        display:inline-block;
+        float:right;
+        color:#fff;
+        text-align:center;
+        text-decoration: none;
+        padding: 8px 40px;
+        border-left: solid 1px #95e1c0;
+        margin-top:1px;
+        cursor:pointer;
+
+        &:hover {
+            background:$primary-hover;
+        }
+    }
+}

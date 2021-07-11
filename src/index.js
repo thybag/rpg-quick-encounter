@@ -7,15 +7,15 @@ import {getRandomPlayerIconList} from './utils/getIconImage.js';
 // want people to include css files in the js itself, vs just giving styles
 // their on entry point, but what u gonna do.
 import 'leaflet/dist/leaflet.css';
-import './app.css';
+import './app.scss';
 
 // Define player defaults
 const defaultPlayers = [
-  {id: 1, name: 'Fighter', icon: null},
-  {id: 2, name: 'Tank', icon: null},
-  {id: 3, name: 'Caster', icon: null},
-  {id: 4, name: 'Healer', icon: null},
-  {id: 5, name: 'Rogue', icon: null},
+    {id: 1, name: 'Fighter', icon: null},
+    {id: 2, name: 'Tank', icon: null},
+    {id: 3, name: 'Caster', icon: null},
+    {id: 4, name: 'Healer', icon: null},
+    {id: 5, name: 'Rogue', icon: null},
 ];
 
 // If we are using this direct we take everything from URL.
@@ -30,18 +30,20 @@ let component = null;
 
 // Do we have enought?
 if (!map) {
-  component = Wizard.make();
+    component = Wizard.make();
 } else {
-  // Basic setup for standalone
-  const options = {
-    'map': map,
-    // Setup default images if none provided
-    'players': configurePlayers(players),
-    'fog': {
-      enabled: !(fog && fog == 'false'),
-    },
-  };
-  component = Encounter.make({options, save: saving});
+    // Basic setup for standalone
+    const options = {
+        data: {
+            'map': map,
+            // Setup default images if none provided
+            'players': configurePlayers(players),
+            'fog': {
+                enabled: !(fog && fog == 'false'),
+            },
+        },
+    };
+    component = Encounter.make({el: document.querySelector('body'), options, save: saving});
 }
 
 export default component;
@@ -57,18 +59,18 @@ export default component;
  * @return {object}
  */
 function parsePlayerUrl(urlString) {
-  // Default players
-  if (!urlString) return localData.getPlayers() || defaultPlayers;
+    // Default players
+    if (!urlString) return localData.getPlayers() || defaultPlayers;
 
-  // Url provided
-  return urlString.split(',').map((p) => {
+    // Url provided
+    return urlString.split(',').map((p) => {
     // Any custom icons?
-    if (p.includes('|')) {
-      const parts = p.split('|');
-      return {name: parts[0], icon: parts[1]};
-    }
-    return {name: p};
-  });
+        if (p.includes('|')) {
+            const parts = p.split('|');
+            return {name: parts[0], icon: parts[1]};
+        }
+        return {name: p};
+    });
 }
 
 /**
@@ -79,14 +81,14 @@ function parsePlayerUrl(urlString) {
  * @return {object}
  */
 function configurePlayers(players) {
-  const iconList = getRandomPlayerIconList();
-  // Add icons to anyone missing one
-  players = players.map((p, index) => {
-    if (!p.icon) {
-      p.icon = iconList[index];
-    }
-    return {id: index, name: p.name, icon: p.icon, spawned: false, x: 0, y: 0};
-  });
+    const iconList = getRandomPlayerIconList();
+    // Add icons to anyone missing one
+    players = players.map((p, index) => {
+        if (!p.icon) {
+            p.icon = iconList[index];
+        }
+        return {id: index, name: p.name, icon: p.icon, spawned: false};
+    });
 
-  return players;
+    return players;
 }
