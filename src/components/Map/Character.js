@@ -77,7 +77,6 @@ export default Component.define({
     },
     bringToFront: function(event) {
         event.preventDefault;
-        console.log('f');
         // Bring character to the front
         globalZIndexOffset++;
         this.marker.setZIndexOffset(globalZIndexOffset*1000);

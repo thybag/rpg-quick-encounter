@@ -18268,7 +18268,6 @@
         },
         bringToFront: function(event) {
             event.preventDefault;
-            console.log("f");
             // Bring character to the front
             globalZIndexOffset++;
             this.marker.setZIndexOffset(globalZIndexOffset*1000);
@@ -18894,7 +18893,7 @@
         events: {
             'click img': 'openPickList',
             'click input[type=submit]': 'save',
-            'keyup input[type=text]': 'detectSubmit'
+            'keyup input[type=text]': 'detectSubmit',
         },
         openPickList: function(e, target) {
             ImagePicker$1.make({target});

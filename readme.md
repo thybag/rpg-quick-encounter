@@ -16,6 +16,7 @@ https://thybag.github.io/rpg-quick-encounter/
 * **Player bar** - Click a player to spawn or focus on them plus reorder freely to match your turn order.   
 * **Custom icons** - Just drag them in to the image picker and they will be available for all your encounters.
 * **URL options** - Create maps using links,  use `map` for the image and `players` with a comma separated list users.
+* **Local storage sync** - Allowing you to setup ambushes off screen by opening a second copy of the map on another window.
 
 ### Planned features
 * Add more features to getting started.
