@@ -5,7 +5,7 @@ Instantly turn any battlemap in to a playable encounter! Setup and run your TTRP
 Try it now at:    
 https://thybag.github.io/rpg-quick-encounter/
 
-![Screenshot of tool in use](https://user-images.githubusercontent.com/887397/108629349-57dcd880-7457-11eb-819a-754be1eb146e.png)
+![Screenshot of tool in use](https://user-images.githubusercontent.com/887397/126874584-9fa924a0-9c1a-4272-806c-170701449d7a.png)
 
 ### How to use it
 * **Any map** - Grab the map url, paste it in and your on your way. Plenty of great ones are shared on [reddit](https://www.reddit.com/r/dndmaps/) every day.
