@@ -1,6 +1,560 @@
 (function () {
     'use strict';
 
+    /**
+     * [safeText description]
+     * @param  {[type]} data [description]
+     * @return {[type]}      [description]
+     */
+    function safeText$1(data) {
+        // Recusivly make sub objects safe
+        if (typeof data === 'object') {
+            Object.entries(data).forEach(([key, value]) => {
+                data[key] = safeText$1(value);
+            });
+            return data;
+        }
+
+        // Render as text node
+        const html = document.createElement('p');
+        html.appendChild(document.createTextNode(data));
+        return html.innerHTML;
+    }
+
+    /**
+     * Create a reusable template
+     * Currently all params passed to render are assumed to be primatives
+     *
+     * @param {[type]} methods [description]
+     */
+    function Template$1(methods) {
+        this.render = function(...args) {
+            // Escape input values
+            if (methods.safe !== false) {
+                // Ensure args are safe
+                args = args.map( (value) => {
+                    return safeText$1(value);
+                });
+            }
+
+            // Render template itself
+            const container = document.createElement('div');
+            const tpl = (typeof methods.template === 'function') ? methods.template(...args) : methods.template;
+            container.innerHTML = tpl;
+
+            if (methods.className) {
+                container.className = methods.className;
+            }
+
+            // Return element
+            return container;
+        };
+    }
+
+    /**
+     * Make a new Template
+     *
+     * @param  {...[type]} args [description]
+     * @return {[type]}         [description]
+     */
+    function Template$2(...args) {
+        return new Template$1(...args);
+    }
+
+    const jsPathRegex = /([^[.\]])+/g;
+
+    /**
+     * Basic model to watch data. Will fire events on changed parts of data tree.
+     *
+     * @param {object} _data - Initial data for model to hold.
+     */
+    const Model = function(_data) {
+        const parent = this;
+
+        // Cache data access/edit
+        const _cache = new WeakMap();
+        const _original = JSON.parse(JSON.stringify(_data));
+
+        // Live data proxy
+        const _real = newDataProxy(_data, '');
+
+        // Eventing
+        this._events = {};
+        this._subscribers = [];
+
+        // Private methods
+
+        /**
+         * _get value from real store
+         *
+         * @param  {[type]} key      [description]
+         * @param  {[type]} fallback [description]
+         * @return {[type]}          [description]
+         */
+        function _get(key, fallback = undefined) {
+            if (!key) return _real;
+
+            const keyArray = Array.isArray(key) ? key : key.match(jsPathRegex);
+            const result = (
+                keyArray.reduce((prevObj, key) => prevObj && prevObj[key], _real)
+            );
+
+            if (result === undefined) return fallback;
+            return result;
+        }
+
+        /**
+         * _set value on real object in store
+         *
+         * @param {string} key      Object path using dot or array notation.
+         * @param {[type]} value [description]
+         * @return {boolean} sucess
+         */
+        function _set(key, value) {
+            // Get key path
+            const keyArray = Array.isArray(key) ? key : key.match(jsPathRegex);
+            // Setup vars
+            let base = _real;
+            let insert; let insertLocation;
+
+            // Iterate object
+            for (let i = 0; i < keyArray.length; i++ ) {
+                if (i === keyArray.length - 1) {
+                    base[keyArray[i]] = value;
+                } else {
+                    // If we need to create new objects as we walk the path, we need to
+                    // do this in a new object rather than updating the existing tree directly.
+                    // This is so that we avoid fireing duplicate update events after each nested
+                    // object is added, and instead attach the object all in one go.
+                    if (base[keyArray[i]] === undefined) {
+                        // If we start building a new tree, track where we need to reinsert
+                        if (!insertLocation) {
+                            insertLocation = [base, keyArray[i]];
+                            insert = base = {};
+                        }
+                        base[keyArray[i]] = {};
+                    }
+
+                    // Get next level
+                    base = base[keyArray[i]];
+                }
+            }
+
+            // If we've build an external object, inject it into the model again
+            if (insertLocation) {
+                const [location, key] = insertLocation;
+                location[key] = insert[key];
+            }
+
+            return true;
+        }
+
+        /**
+         * Apply data changes
+         * @param  {[type]} ctx [description]
+         */
+        function applyChanges(ctx) {
+            // Detect changes to data, fireing events as needed.
+            const change = parent.detectChanges(ctx.split('.'), _original, _data);
+
+            // Update internal data cache to match
+            if (change !== 'NONE') {
+                parent.commitChanges(ctx.split('.'), _original, _data);
+                parent.trigger('updated');
+            }
+        }
+
+        /**
+         * Create watcher proxy to manage each object in model
+         * Provides access to get,set,on helpers + wraps access in proxies
+         * in order to allow for dynamic change detection
+         *
+         * @param  {object} result  data to wrap in proxy
+         * @param  {string} context datapath to current object
+         * @return {Proxy}          Object wrapped in Proxy
+         */
+        function newDataProxy(result, context) {
+            const proxyTraps = {
+                get(obj, prop, receiver) {
+                    // Get real data from object
+                    const result = Reflect.get(obj, prop);
+
+                    // Return primitive or data wrapped in proxy
+                    return parent.isObject(result) ? newDataProxy(result, getContext(context, prop)) : result;
+                },
+                set(obj, prop, value) {
+                    // Update local object
+                    const success = Reflect.set(obj, prop, value);
+                    // Trigger change detection and sync to original
+                    applyChanges(getContext(context, prop));
+
+                    return success;
+                },
+            };
+
+            // Config proxy or get from cache
+            const resultProxy = _cache.get(result) || new Proxy(result, proxyTraps);
+            _cache.set(result, resultProxy);
+            return resultProxy;
+        }
+
+        /**
+         * Create accessor proxy to manage access to data model
+         * Holds a context data-path, which is then uses to get/set
+         * data from the store.
+         *
+         * This approach means that stored re fences in code will never
+         * become out of data, or become orphaned from the store
+         *
+         * @param  {string} context datapath to current object
+         * @return {Proxy}          Object wrapped in Proxy
+         */
+        function newAccessProxy(context) {
+            const proxyTraps = {
+                get(obj, prop, receiver) {
+                    // Handle magic methods for object
+                    if (prop === 'get') return magicGet(parent, context);
+                    if (prop === 'set') return magicSet(parent, context);
+                    if (prop === 'on') return magicOn(parent, context);
+                    if (prop === 'trigger') return magicTrigger(parent, context);
+                    if (prop === 'getContext') return () => context;
+                    // Support json stringify by pass access to the real object
+                    if (prop === 'toJSON') return () => _get(context);
+
+                    // else just get as normal
+                    return parent.get(getContext(context, prop));
+                },
+                set(obj, prop, value) {
+                    // Set data to the context path
+                    return parent.set(getContext(context, prop), value);
+                },
+                ownKeys() {
+                    return Object.keys(_get(context));
+                },
+                getOwnPropertyDescriptor() {
+                    return {configurable: true, enumerable: true, value: '123'};
+                },
+                has(obj, prop) {
+                    /* eslint-disable no-prototype-builtins */
+                    // We don't know the type of the souce object
+                    // so have to blindly pass this down
+                    return _get(context).hasOwnProperty(prop);
+                },
+            };
+
+            // Return access proxy
+            return new Proxy({}, proxyTraps);
+        }
+
+        /**
+         * Get data from the store
+         *
+         * @param  {[type]} key      [description]
+         * @param  {[type]} fallback [description]
+         * @return {primitive|accessProxy}          [description]
+         */
+        this.get = (key, fallback) => {
+            const result = _get(key, fallback);
+            return (parent.isObject(result)) ? newAccessProxy(key) : result;
+        };
+
+        /**
+         * Set data to the store
+         * @param  {[type]} key   [description]
+         * @param  {[type]} value [description]
+         * @return {[type]}       [description]
+         */
+        this.set = (key, value) => _set(key, value);
+
+        // get data
+        this.data = this.get();
+    };
+
+
+    /**
+     * Trigger event on model
+     *
+     * @param  {[type]}    event [description]
+     * @param  {...[type]} args  [description]
+     */
+    Model.prototype.trigger = function(event, ...args) {
+        // Fire own event
+        for (const i of this._events[event] || []) {
+            // Trigger event (either func or method to call)
+            if (typeof i[1] === 'function') {
+                i[1](...args);
+            } else {
+                this[i[1]](...args);
+            }
+        }
+
+        // Fire listeners
+        for (const [subscriber, ns] of this._subscribers) {
+            // Optionally namespace listener.
+            // e.g. players:update:name
+            const namespace = ns ? ns+':' : '';
+            subscriber.trigger(namespace+event, ...args);
+        }
+    };
+
+    /**
+     * Listen for event on model
+     * @param  {string} key    Object path using dot or array notation.
+     * @param  {[type]} method [description]
+     * @return {[type]}        [description]
+     */
+    Model.prototype.on = function(key, method) {
+        (this._events[key] = this._events[key] || []).push([key, method]);
+        return this;
+    };
+
+    /**
+     * Remove event listener
+     * @param  {string} key    Object path using dot or array notation.
+     * @param  {[type]} method [description]
+     * @return {[type]}        [description]
+     */
+    Model.prototype.off = function(key, method) {
+        if (!this._events[key]) return this;
+
+        // Delete all listners if no method
+        if (!method) {
+            delete this._events[key];
+            return this;
+        }
+        // Else only one with method
+        for (const evt in this._events[key]) {
+            if (this._events[key][evt][1] == method) {
+                this._events[key].splice(evt, 1);
+            }
+        }
+
+        return this;
+    };
+
+    /**
+     * Register self as an external listener for model events
+     * @param {[type]} subscriber [description]
+     * @param {[type]} namespace [description]
+     * @return {object} model
+     */
+    Model.prototype.subscribe = function(subscriber, namespace = '') {
+        if (typeof subscriber.trigger !== 'function') {
+            throw new Error('Unsupported listener type provided. Must implement trigger method.');
+        }
+        this._subscribers.push([subscriber, namespace]);
+        return this;
+    };
+    /**
+     * Remove self as an external listener for model events
+     * @param {[type]} subscriber [description]
+     * @param {[type]} namespace [description]
+     * @return {object} model
+     */
+    Model.prototype.unsubscribe = function(subscriber, namespace = '') {
+        this._subscribers = this._subscribers.filter(([sub, ns]) => {
+            return !(ns === namespace && sub === subscriber);
+        });
+
+        return this;
+    };
+
+    // Util to clone object
+    Model.prototype.copy = function(data) {
+        return (typeof data == 'object') ? JSON.parse(JSON.stringify(data)) : data;
+    };
+
+    // Detect change type for a primative
+    Model.prototype.detectChangeType = function(original, updated) {
+        if (typeof updated === 'undefined' && typeof original === 'undefined') return 'REMOVE'; // complete detach
+        if (typeof original === 'undefined') return 'CREATE'; // additional key added to our new data
+        if (typeof updated === 'undefined') return 'REMOVE'; // old key removed from our new data
+        if (original==updated) return 'NONE'; // data unchanged between the two keys
+
+        return 'UPDATE'; // A mix - so an update
+    };
+
+    // Detect objects that are not NULL values
+    Model.prototype.isObject = function(value) {
+        return (typeof value === 'object' && value !== null);
+    };
+
+    // Detect changes in watched data
+    Model.prototype.detectChanges = function(keys, original, updated, namespace = '') {
+        // Detect any changes in the affected data path
+        // (keys is an array starting from the root of the affected location)
+        const next = keys.shift();
+        let returnType = 'UPDATE';
+
+        namespace = namespace ? `${namespace}.${next}` : next;
+
+        // Get values we're comparing
+        original = original ? original[next] : undefined;
+        updated = updated ? updated[next] : undefined;
+
+        // Target key not yet reached, dig on to the next key
+        if (keys.length != 0) {
+            returnType = this.detectChanges(this.copy(keys), original, updated, namespace);
+            // If real change was a create or remove, this parent has been updated, so swap type
+            if (returnType == 'CREATE' || returnType == 'REMOVE') returnType = 'UPDATE';
+        }
+
+        // Target depth reached.
+        if (keys.length == 0) {
+            // Detect attribute changes to children
+            // ie. if you remove an object, its children need to fire remove events
+            if (this.isObject(updated) || this.isObject(original)) {
+                // Check for field changes
+                const fields = new Set([
+                    ...(this.isObject(updated)) ? Object.keys(updated) : [],
+                    ...(this.isObject(original)) ? Object.keys(original) : [],
+                ]);
+
+                const results = [];
+                for (const key of fields) {
+                    results.push(this.detectChanges([key], original, updated, namespace));
+                }
+
+                // Object checks
+                // If both old/new don't exist, these values were detached/removed
+                // If only original doesn't, then we're creating
+                // If only new doesn't, we're removing
+                if (typeof updated === 'undefined' && typeof original === 'undefined') returnType = 'REMOVE';
+                if (typeof original === 'undefined') returnType = 'CREATE';
+                if (typeof updated === 'undefined') returnType = 'REMOVE';
+                if (results.length === 0) returnType = 'NONE'; // Empty
+
+                // If all the sub objects were unchanged, the ob was unchanged.
+                if (results.length !== 0 && results.every(function(val) {
+                    return val == 'NONE';
+                })) {
+                    returnType = 'NONE';
+                }
+            } else {
+                // Else, detect change type on this specific attribute
+                returnType = this.detectChangeType(original, updated);
+            }
+        }
+
+        // Workout wildcard datapath
+        const wildcardNamespace = namespace.substr(0, namespace.lastIndexOf('.')+1) + '*';
+        // reload updated from store so we return proxy instance of objects
+        const updatedData = (typeof updated === 'object') ? this.get(namespace) : updated;
+
+        // Fire change type events
+        switch (returnType) {
+        case 'CREATE':
+            this.trigger('create:'+namespace, updatedData);
+            this.trigger('create:'+wildcardNamespace, updatedData);
+            break;
+        case 'UPDATE':
+            this.trigger('update:'+namespace, updatedData, original);
+            this.trigger('update:'+wildcardNamespace, updatedData, original);
+            break;
+        case 'REMOVE':
+            this.trigger('remove:'+namespace, original);
+            this.trigger('remove:'+wildcardNamespace, original);
+            break;
+        case 'NONE':
+            this.trigger('unchanged:'+namespace, updatedData);
+            break;
+        }
+
+        // Fire general change events, both namspaced and global.
+        if (returnType !== 'NONE') {
+            this.trigger('change:'+namespace, returnType, updated, original);
+            this.trigger('change:'+wildcardNamespace, returnType, updated, original);
+        }
+
+        this.trigger('change', returnType, namespace, updated, original);
+
+        return returnType;
+    };
+
+    // Apply change to original, so new changes can be detected
+    Model.prototype.commitChanges = function(keys, original, updated) {
+        const next = keys.shift();
+        // Insert either at most accurate point, or where original does not yet exist
+        if (keys.length == 0 || !original[next]) {
+            original[next] = this.copy(updated[next]);
+            return;
+        }
+        return this.commitChanges(keys, original[next], updated[next]);
+    };
+
+
+    /**
+     * Proxy access for `get`
+     * @param  {[type]} parent  [description]
+     * @param  {[type]} context [description]
+     * @return {[type]}         [description]
+     */
+    function magicGet(parent, context) {
+        return function(key) {
+            return parent.get(`${context}.${key}`);
+        };
+    }
+
+    /**
+     * Proxy access for `set`
+     * @param  {[type]} parent  [description]
+     * @param  {[type]} context [description]
+     * @return {[type]}         [description]
+     */
+    function magicSet(parent, context) {
+        return function(key, value) {
+            return parent.set(`${context}.${key}`, value);
+        };
+    }
+
+    /**
+     * Proxy access for `on`
+     * @param  {[type]} parent  [description]
+     * @param  {[type]} context [description]
+     * @return {[type]}         [description]
+     */
+    function magicOn(parent, context) {
+        return function(event, callback) {
+            let listener = `${event}:${context}`;
+            // Event may either be purely the event type (change,update)
+            // or type + sub key change:subAttr. In case of sub attr
+            // we want to insert context between the event and the path
+            if (event.includes(':')) {
+                const parts = event.split(':');
+                listener = `${parts[0]}:${context}.${parts[1]}`;
+            }
+            return parent.on(listener, callback);
+        };
+    }
+
+    /**
+     * Proxy access for `on`
+     * @param  {[type]} parent  [description]
+     * @param  {[type]} context [description]
+     * @return {[type]}         [description]
+     */
+    function magicTrigger(parent, context) {
+        return function(event, data) {
+            let listener = `${event}:${context}`;
+            if (event.includes(':')) {
+                const parts = event.split(':');
+                listener = `${parts[0]}:${context}.${parts[1]}`;
+            }
+            return parent.trigger(listener, data);
+        };
+    }
+
+    /**
+     * getContext return datapath to current target.
+     *
+     * @param  {[type]} context [description]
+     * @param  {[type]} prop    [description]
+     * @return {[type]}         [description]
+     */
+    function getContext(context, prop) {
+        return context ? context + '.' + prop : prop;
+    }
+
     // Use whitelist to determine if events exist.
     // In many cases only the "target" will have these & we will be catching the bubbled version.
     const nativeEvents = [
@@ -19,22 +573,22 @@
         'contextmenu',
         'focusin', // focus
         'focusout', // blur?
-        'change'
+        'change',
     ];
-    // Blur/focus cannot be defered, so use 
+    // Blur/focus cannot be defered, so use
     // override events instead on listeners
     const eventOverride = {
         'focus': 'focusin',
-        'blur': 'focusout'
+        'blur': 'focusout',
     };
 
     const Component = function() {
         // Component
-        let ComponentImplementation = function(config) {
+        const ComponentImplementation = function(config) {
             // Copy methods to Object
             if (config) {
                 Object.keys(config).forEach(function(key) {
-                    if(key != 'events') this[key] = config[key];
+                    if (key != 'events') this[key] = config[key];
                 }, this);
             }
 
@@ -43,21 +597,56 @@
                 this.el = document.createElement('div');
             }
 
-            this.initialize.apply(this, arguments);
-            this.connect.apply(this, [config.events]);
+            // Init templates
+            if (this.template) {
+                this._template = Template$2({template: this.template, className: this.className});
+            }
+
+            // Init data
+            if (this.data) {
+                // Connect model
+                this._model = new Model(this.data);
+                this.data = this._model.data;
+            }
+
+            /* eslint-disable prefer-rest-params */
+            this.initialize(...arguments);
+            this.connect(config.events);
         };
 
+        /**
+         * setEl Set contents of base el based on Element.
+         *
+         * @param {[type]} el [description]
+         */
+        ComponentImplementation.prototype.setEl = function(el) {
+            this.el.innerHTML = el.innerHTML;
+        };
+
+        /**
+         * Trigger - Trigger an event
+         *
+         * @param  {[type]}    event [description]
+         * @param  {...[type]} args  [description]
+         */
         ComponentImplementation.prototype.trigger = function(event, ...args) {
-            for (let i of this._events[event] || []) {
+            for (const i of this._events[event] || []) {
                 // Trigger event (either func or method to call)
                 i[1](...args);
             }
         };
+
+        /**
+         * Add listener
+         * @param  {[type]} key    [description]
+         * @param  {[type]} method [description]
+         * @return {[type]}        [description]
+         */
         ComponentImplementation.prototype.on = function(key, method) {
             // Add a listener
-            let split = key.indexOf(' ');
-            let event = (split===-1) ? key : key.substr(0,split);
-            let target = (split===-1) ? '' : key.substr(split+1);
+            const split = key.indexOf(' ');
+            let event = (split===-1) ? key : key.substr(0, split);
+            const target = (split===-1) ? '' : key.substr(split+1);
 
             // Override event type if needed.
             if (eventOverride[event]) {
@@ -65,10 +654,10 @@
             }
 
             // Wrap runner in to method
-            let run = (...args) => {
-                if (typeof method === "function") {
-                    method(...args);
-                }else {
+            const run = (...args) => {
+                if (typeof method === 'function') {
+                    method.apply(this, args);
+                } else {
                     this[method](...args);
                 }
             };
@@ -79,15 +668,10 @@
                 return this;
             }
 
-            // If no target, bind to root el
-            if (!target) {
-                this.el.addEventListener(event, run);
-                (this._events[key] = this._events[key] || []).push([event, run]);
-                return this;
-            }
-
             // Else handle as deligated
-            let handler = (e) => {
+            const handler = (e) => {
+                if (!target) return run(e, e.target);
+
                 // e.target was the clicked element
                 if (e.target && e.target.matches(target)) {
                     // If function? run it
@@ -99,37 +683,109 @@
             (this._events[key] = this._events[key] || []).push([event, handler]);
             return this;
         };
+
+        /**
+         * Remove event listener
+         *
+         * @param  {[type]} key [description]
+         * @return {[type]}     [description]
+         */
         ComponentImplementation.prototype.off = function(key) {
             // Remove a listener
-            for (let [event, handler] of this._events[key] || []) {
-                 this.el.removeEventListener(event, handler);
+            for (const [event, handler] of this._events[key] || []) {
+                this.el.removeEventListener(event, handler);
             }
             delete this._events[key];
+
+            return this;
         };
+
+        /**
+         * Configure events for el
+         *
+         * @param  {[type]} events [description]
+         */
         ComponentImplementation.prototype.connect = function(events) {
             // Create events on new obj, so components don't share
             this._events = [];
+
+            // Add listener to own model
+            if (this._model) {
+                this._model.subscribe(this, 'data');
+                this.on('data:updated', 'render');
+            }
+
             if (!events || typeof events !== 'object') return;
+
             // connected all events
-            for (let [key, method] of Object.entries(events)) {
+            for (const [key, method] of Object.entries(events)) {
                 this.on(key, method);
             }
         };
+
+        /**
+         * Disconnect all events from el
+         */
         ComponentImplementation.prototype.disconnect = function() {
             // Remove all events
-            for (let [key, method] of Object.entries(this._events)) {
+            for (const [key] of Object.entries(this._events)) {
                 this.off(key);
             }
+
+            // Remove listener from own model
+            if (this._model) this._model.unsubscribe(this, 'data');
         };
-        ComponentImplementation.prototype.listenTo = function(model) {
-            if (typeof model.addListener !== 'function'){
-                throw 'Model does not support listeners';
+
+        /**
+         * Remove this el
+         */
+        ComponentImplementation.prototype.destroy = function() {
+            this.disconnect();
+            if (this.el) this.el.remove();
+        };
+
+        /**
+         * Listen to a model / other component
+         *
+         * @param  {[type]} model     [description]
+         * @param  {String} namespace [description]
+         */
+        ComponentImplementation.prototype.subscribeTo = function(model, namespace = '') {
+            if (typeof model.subscribe !== 'function') {
+                throw new Error('Model does not support listeners');
             }
-            model.addListener(this);
+            model.subscribe(this, namespace);
         };
-        // Placeholders
-        ComponentImplementation.prototype.initialize = function() {};
+
+        /**
+         * Called on boot.
+         * Triggers render by default
+         */
+        ComponentImplementation.prototype.initialize = function() {
+            this.render();
+        };
+
+        /**
+         * render method defines display logic. Normally calls tpl
+         */
         ComponentImplementation.prototype.render = function() {};
+
+        /**
+         * Render template defined in template var
+         *
+         * @param  {...[type]} args [description]
+         * @return {[type]}         [description]
+         */
+        ComponentImplementation.prototype.tpl = function(...args) {
+            if (!this._template) {
+                throw new Error('This component does not implement a template');
+            }
+            return this._template.render(...args);
+        };
+
+        // Extra methods
+        ComponentImplementation.prototype.addEventListener = ComponentImplementation.prototype.on;
+        ComponentImplementation.prototype.removeEventListener = ComponentImplementation.prototype.off;
 
         // Factory features
         this.config = [];
@@ -140,253 +796,31 @@
         };
 
         // Define base component
-        this.define = function(config)
-        {
-            let definedComponent = new Component;
-            definedComponent.config = config;
+        this.define = function(config) {
+            const definedComponent = new Component;
+            definedComponent.config = {...this.config, ...config};
+            return definedComponent;
+        };
+
+        // Compose component from multiple
+        this.compose = function(...args) {
+            let config = {};
+
+            args.forEach((c)=> {
+                if (c instanceof Component) {
+                    config = {...config, ...c.config};
+                } else if (typeof c === 'object') {
+                    config = {...config, ...c};
+                }
+            });
+
+            const definedComponent = new Component;
+            definedComponent.config = {...this.config, ...config};
             return definedComponent;
         };
     };
 
     var Component$1 = new Component;
-
-    /**
-     * Basic model to watch data. Will fire events on changed parts of data tree.
-     *
-     */
-    const Model = function(_data) {
-        let parent = this;
-        // Cache data access/edit
-        let _cache = new WeakMap();
-        let _original = JSON.parse(JSON.stringify(_data));
-
-        // Eventing
-        this._events = {};
-        this._listeners = [];
-
-        // Dete
-        this.applyChanges = function(ctx)
-        {
-            // Detect changes to data
-            let change = this.detectChanges(ctx.split('.'), _original, _data);
-            // Update internal data to match
-            if (change !== 'NONE') {
-                this.commitChanges(ctx.split('.'), _original, _data);
-                this.trigger('updated');
-            } 
-        };
-
-        // Create watcher proxy
-        function newProxy(result, context) {
-            const proxyTraps =  {
-                get: function(obj, prop, receiver)
-                {
-                    let ctx = context ? context + '.' + prop : prop;
-                    let result = Reflect.get(obj, prop);
-
-                    if (parent.isObject(result)) {
-                        result = newProxy(result, ctx);
-                    }
-
-                    // Trigger read event
-                    parent.trigger("read", ctx);
-                    return result;
-                },
-                set: function(obj, prop, value) {
-                    let success = Reflect.set(obj, prop, value);
-                    let ctx = context ? context + '.' + prop : prop;
-                    // Detect changes and fire relevent events
-                    parent.applyChanges(ctx);
-
-                    return success;
-                }
-            };
-            // Config proxy or get from cache
-            const resultProxy = _cache.get(result) || new Proxy(result, proxyTraps);
-            _cache.set(result, resultProxy);
-            return resultProxy;
-        }
-        // Watch changes via proxy
-        this.data = newProxy(_data, '');
-    };
-
-    const jsPathRegex = /([^[.\]])+/g;
-
-    // get attribute
-    Model.prototype.get = function(key, fallback = undefined)
-    {
-        if (!key) return fallback;
-
-        const keyArray = Array.isArray(key) ? key : key.match(jsPathRegex);
-
-        return (
-            keyArray.reduce((prevObj, key) => prevObj && prevObj[key], this.data) || fallback
-        );
-    };
-    // Set attribute
-    Model.prototype.set = function(key, value)
-    {
-        const keyArray = Array.isArray(key) ? key : key.match(jsPathRegex);
-
-        keyArray.reduce((acc, prop, i) => {
-            if (acc[prop] === undefined) acc[prop] = {};
-            if (i === keyArray.length - 1) acc[prop] = value;
-            return acc[prop];
-        }, this.data);
-    };
-    // Trigger event
-    Model.prototype.trigger = function(event, ...args) {
-        // Fire own event
-        for (let i of this._events[event] || []) {
-            // Trigger event (either func or method to call)
-            if (typeof i[1] === "function") {
-                i[1](...args);
-            }else {
-                this[i[1]](...args);
-            }
-        }
-
-        // Fire listeners
-        for(let listener of this._listeners) {
-            listener.trigger(event, ...args);
-        }
-    };
-    // Add event
-    Model.prototype.on = function(key, method) {
-        (this._events[key] = this._events[key] || []).push([key, method]);
-        return this;
-    };
-    // Remove event
-    Model.prototype.off = function(key, method) {
-        if (!this._events[key]) return this;
-
-        // Delete all listners if no method
-        if (!method) {
-            delete this._events[key];
-            return this;
-        }
-        // Else only one with method
-        for (let evt in this._events[key]) {
-            if(this._events[key][evt][1] == method) {
-                this._events[key].splice(evt, 1);
-            }
-        }
-
-        return this;
-    };
-    // Add listener
-    Model.prototype.addListener = function (listener) {
-        if (typeof listener.trigger !== 'function'){
-            throw 'Unsupported listener type provided. Must implement trigger method.'
-        }
-        this._listeners.push(listener);
-        return this;
-    };
-    // Remove listener
-    Model.prototype.removeListener = function (listener) {
-        let idx = this._listeners.indexOf(listener);
-        if (idx !== -1) {
-            this._listeners.splice(this._listeners.indexOf(listener), 1);
-        }
-        return this;
-    };
-
-    // Util to clone object
-    Model.prototype.copy = function(data)
-    {
-        return (typeof data == 'object') ? JSON.parse(JSON.stringify(data)) : data;
-    };
-
-    // Detect change type for a primative
-    Model.prototype.detectChangeType = function(original, updated)
-    {
-        if(typeof original === 'undefined') return "CREATE"; // additional key added to our new data
-        if(typeof updated === 'undefined') return "REMOVE"; // old key removed from our new data
-        if(original==updated) return "NONE"; // data unchanged between the two keys
-
-        return "UPDATE"; // A mix - so an update
-    };
-
-    // Detect objects that are not NULL values
-    Model.prototype.isObject = function (value)
-    {
-       return (typeof value === 'object' && value !== null);
-    };
-
-    // Detect changes in watched data
-    Model.prototype.detectChanges = function (keys, original, updated, namespace = '')
-    {
-        // Detect any changes in the affected data path
-        // (keys is an array start from root the the affected location)
-        let next = keys.shift();
-        let returnType = 'UPDATE';
-        namespace = namespace ? `${namespace}.${next}` : next;
-
-        // Get values we're comparing
-        original = original ? original[next] : undefined;
-        updated = updated ? updated[next] : undefined;
-
-        // Target key not yet reached, dig on to the next key
-        if (keys.length != 0) returnType = this.detectChanges(this.copy(keys), original, updated, namespace);
-
-        // Target depth reached.
-        if (keys.length == 0) {
-            // Detect attribute changes to children
-            if (this.isObject(updated) ||this.isObject(original)) {
-                // Check for field changes
-                let fields = new Set([
-                    ...(updated) ? Object.keys(updated) : [],
-                    ...(original) ? Object.keys(original) : []
-                ]);
-
-                let results = [];
-                for (let key of fields) {
-                    results.push(this.detectChanges([key], original, updated, namespace));
-                }
-                // Object checks
-                if(!original && original !== false) returnType = 'CREATE';
-                if(!updated && updated !== false) returnType = 'REMOVE';
-                if (results.every(function(val){ return val == 'NONE'})) {
-                    returnType = 'NONE';
-                }
-            } else {
-                // Else, detect change type on this specific attribute
-                returnType = this.detectChangeType(original, updated);
-            }
-        }
-
-        // Fire change type events
-        switch (returnType) {
-            case 'CREATE':
-                this.trigger("create:"+namespace, updated);
-                break;
-            case 'UPDATE':
-                this.trigger("update:"+namespace, updated, original);
-                break;
-            case 'REMOVE':
-                this.trigger("remove:"+namespace, original);
-                break;
-            case 'NONE':
-                this.trigger("unchanged:"+namespace);
-                break;
-        }
-
-        // Fire general change events
-        this.trigger("change:"+namespace, returnType, updated, original);
-        this.trigger("change", returnType, namespace, updated, original);
-
-        return returnType;
-    };
-    // Apply change to original, so new changes can be detected
-    Model.prototype.commitChanges = function(keys, original, updated){
-        let next = keys.shift();
-        // Insert either at most accurate point, or where original deoes not yet exist
-        if (keys.length == 0  || !original[next]) {
-            original[next] = this.copy(updated[next]);
-            return;
-        }
-        return this.commitChanges(keys, original[next], updated[next]);
-    };
 
     var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -14457,56 +14891,659 @@
 
     });
 
+    let allocated = 0;
+
+    /**
+     * UID
+     * @return {string} Unique ID for this instance
+     */
+    function uid() {
+        return (new Date().getTime()) + '_' + (allocated++);
+    }
+
+    var localData = new function() {
+        const storage = window.localStorage;
+        const mapPrefix = 'map:';
+        let dataPrefix = '';
+
+        this.setDataPrefix = function(newPrefix) {
+            dataPrefix = newPrefix;
+        };
+        // Get helper to reteave a value from store
+        this._get = function(key) {
+            return JSON.parse(storage.getItem(dataPrefix + key));
+        };
+        // Set helper, to save a value to store
+        this._set = function(key, value) {
+            return storage.setItem(dataPrefix + key, JSON.stringify(value));
+        };
+        // Exists helper to check if value exists in store.
+        this._has = function(key) {
+            return (storage.getItem(dataPrefix + key));
+        };
+
+        this.hasMap = function(key) {
+            return (this._has(mapPrefix + key));
+        };
+
+        this.loadMap = function(key) {
+            const map = this._get(mapPrefix + key);
+            map['data:updated'] = null;
+            return map;
+        };
+
+        this.saveMap = function(key, data) {
+            const clean = JSON.parse(JSON.stringify(data));
+            // Inject last updated.
+            clean['data:updated'] = new Date();
+
+            return this._set(mapPrefix + key, clean);
+        };
+
+        // Get all map paths in dataPrefix
+        this.getMaps = function() {
+            // Find matching maps
+            const maps = Object.entries(storage).filter(
+                // Include only relevent maps
+                ([key, data]) => {
+                    return key.startsWith(dataPrefix + mapPrefix);
+                },
+            ).map(
+                // Parse in to real data
+                ([key, data]) => {
+                    return JSON.parse(data);
+                },
+            );
+
+            // Most recently used first
+            maps.sort(function(b, a) {
+                // Legacy issue for now is a lot of older maps won't have the updated date.
+                // For these assume it was 2020.
+                const d1 = (a['data:updated']) ? new Date(a['data:updated']) : new Date('2020-01-01');
+                const d2 = (b['data:updated']) ? new Date(b['data:updated']) : new Date('2020-01-01');
+                return d1-d2;
+            });
+
+            return maps;
+        };
+
+        // Get all icons
+        this.getIcons = function() {
+            const icons = this._get('icons');
+            return (icons) || {};
+        };
+
+        // get a single icon
+        this.getIcon = function(id) {
+            const icons = this.getIcons();
+            return icons[id];
+        };
+
+        // Save a new icon
+        this.saveIcon = function(iconPath) {
+            const icons = this.getIcons();
+            icons['icon:' + uid()] = iconPath;
+            this._set('icons', icons);
+        };
+
+        this.removeIcon = function() {
+
+        };
+
+        this.setPlayers = function(players) {
+            this._set('players', players);
+        };
+
+        this.getPlayers = function() {
+            const players = this._get('players');
+            return players || null;
+        };
+
+        this.listen = function(map, callback) {
+            if (!this.hasMap(map)) return;
+
+            const dataKey = dataPrefix + mapPrefix + map;
+            window.addEventListener('storage', (change) => {
+                if (change.key === dataKey) {
+                    const newMap = JSON.parse(change.newValue);
+                    newMap['data:updated'] = null;
+                    callback(newMap);
+                }
+            });
+        };
+    };
+
+    // Player icons
+    const playerIcons = 9;
+    const monsterIcons = 33;
+    let iconPath = 'assets/';
+
+    const iconList$3 = []; const monsterList = [];
+
+    for (let i = 1; i <= playerIcons; i++) iconList$3.push('p:' + i);
+    for (let i = 1; i <= monsterIcons; i++) monsterList.push('m:' + i);
+
+    // Get all player icons
+    const getPlayerIcons = function() {
+        return iconList$3;
+    };
+    // Get all monster icons
+    const getMonsterIcons = function() {
+        return monsterList;
+    };
+
+    // Get all custom icons
+    const getCustomIcons = function() {
+        return Object.keys(localData.getIcons());
+    };
+
+    // Get random player icon
+    const getRandomPlayerIcon = function() {
+        return iconList$3[Math.floor((Math.random() * iconList$3.length))];
+    };
+
+    // Get random monster icon
+    const getRandomMonsterIcon = function() {
+        return monsterList[Math.floor((Math.random() * monsterList.length))];
+    };
+
+    // Get player icons as unique list
+    const getRandomPlayerIconList = function() {
+        // No point using a smarter algo for 8 elements.
+        return iconList$3.sort(() => Math.random() - 0.5);
+    };
+
+    // Change icon path if being used via another app
+    const setIconPath = function(path) {
+        iconPath = path;
+    };
+
+    /**
+     * Convert icon to a usable image path
+     *
+     * @param  {[type]} icon [description]
+     * @return {[type]}      [description]
+     */
+    function getIconImage(icon) {
+        if (!icon) {
+            return '';
+        }
+
+        if (icon.startsWith('icon:')) {
+            return localData.getIcon(icon);
+        }
+        if (icon.startsWith('p:')) {
+            return `${iconPath}players/${icon.substr(2)}.png`;
+        }
+        if (icon.startsWith('m:')) {
+            return `${iconPath}monsters/${icon.substr(2)}.png`;
+        }
+
+        return icon;
+    }
+
+    /**
+     * Make text safe to include in html
+     *
+     * @param  {[type]} text [description]
+     * @return {[type]}      [description]
+     */
+    function safeText(text) {
+        // Render as text node
+        const html = document.createElement('p');
+        html.appendChild(document.createTextNode(text));
+        return html.innerHTML;
+    }
+
+    /**
+     * Create a reusable template
+     * @param {[type]} methods [description]
+     */
+    function Template(methods) {
+        this.render = function(...args) {
+            // Escape input values
+            if (methods.safe !== false) {
+                // Ensure args are safe
+                args = args.map((value) => {
+                    return safeText(value);
+                });
+            }
+
+            // Render template itself
+            const container = document.createElement('div');
+            const tpl = methods.template(...args);
+            container.innerHTML = tpl;
+
+            if (methods.className) {
+                container.className = methods.className;
+            }
+
+            // Return element
+            return container;
+        };
+    }
+
+    /**
+     * Confirm we can access provided image.
+     *
+     * @param  {[type]} imgPath [description]
+     * @return {[type]}         [description]
+     */
     async function checkImage(imgPath) {
-      return await new Promise((resolve, reject) => {
-        const img = document.createElement('img');
-        img.src = imgPath;
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-      });
+        return await new Promise((resolve, reject) => {
+            const img = document.createElement('img');
+            img.src = imgPath;
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+        });
     }
 
-    async function createMap(target, mapPath) {
-      const img = await checkImage(mapPath);
+    const iconList$2 = new Template({
+        template: () => {
+            let NPCList = ''; let MonsterList = ''; let CustomList = '';
 
-      // Create map
-      const map = leafletSrc.map(target, {
-        crs: leafletSrc.CRS.Simple,
-        zoomSnap: 0.20,
-      });
+            getPlayerIcons().forEach((i) => {
+                NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+            });
+            getMonsterIcons().forEach((i) => {
+                MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+            });
+            getCustomIcons().forEach((i) => {
+                CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+            });
 
-      // Config map size
-      const width = Math.round(img.width / 10);
-      const height = Math.round(img.height / 10);
-      const bounds = [[0, 0], [height, width]];
+            return `
+      <div>Your images</div>
+          <span>+</span> 
+          ${CustomList}
+      <div>NPCs/Players</div>
+          ${NPCList}
+      <div>Monsters</div>
+          ${MonsterList}
+      `;
+        },
+    });
 
-      leafletSrc.imageOverlay(mapPath, bounds).addTo(map);
-      map.fitBounds(bounds);
+    /**
+     * load filedata from upload
+     *
+     * @param  {[type]} iconImg [description]
+     * @return {[type]}         [description]
+     */
+    async function loadFile$2(iconImg) {
+        const imgData = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(iconImg);
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+        });
 
-      // Config defualt map zoom.
-      const zoom = map.getZoom();
-      map.setZoom(zoom + 0.5);
-      map.setMaxZoom(zoom + 4);
-      map.setMinZoom(zoom - 0.5);
-
-      return map;
+        return checkImage(imgData);
     }
 
+    /**
+     * resize and return as final icon image to store
+     *
+     * @param  {[type]} iconImg [description]
+     * @return {[type]}         [description]
+     */
+    async function imageToIcon$2(iconImg) {
+        const img = await loadFile$2(iconImg);
+
+        // Local storage is small so we wanna scale it down before we save
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // draw source image into the off-screen canvas:
+        canvas.width = 70;
+        canvas.height = 70;
+        ctx.drawImage(img, 0, 0, 70, 70);
+
+        return canvas.toDataURL('image/webp', 0.8);
+    }
+
+    var ImagePicker$2 = Component$1.define({
+        initialize: function(options) {
+            this.el = this.tpl();
+            this.parent = options.target;
+
+            this.render();
+            // Add to world
+            document.body.appendChild(this.el);
+        },
+        className: 'modal',
+        template: () => {
+            return `
+            <div class='image-picker'>
+                <h2>Image picker</h2>
+                 <main></main>
+                <footer><button>Cancel</button></footer>
+            </div>
+        `;
+        },
+        events: {
+            'click img': 'select',
+            'click span': 'addIcon',
+            // Close options
+            'click button': 'close',
+            'click .modal': 'close',
+            // Upload options
+            'dragover main': 'uploadEnable',
+            'drop main': 'upload',
+            'dragenter main': 'uploadFocus',
+            'dragleave main': 'uploadBlur',
+        },
+        uploadEnable: function(e) {
+            // Need this to be able to upload.
+            e.preventDefault();
+        },
+        select: function(e, item) {
+            this.parent.src = item.src;
+            this.parent.dataset.id = (item.dataset.id) ? item.dataset.id : item.src;
+
+            this.close();
+        },
+        close: function() {
+            this.destroy();
+        },
+        uploadFocus: function(e) {
+            e.preventDefault();
+            this.el.querySelector('.image-picker').classList.add('uploadHover');
+        },
+        uploadBlur: function(e) {
+            e.preventDefault();
+            this.el.querySelector('.image-picker').classList.remove('uploadHover');
+        },
+        upload: async function(e) {
+            e.preventDefault();
+
+            const files = e.dataTransfer.files;
+
+            // Get files that were dragged
+            for (let f = 0; f < files.length; f++) {
+                const file = files[f];
+                // Only deal with images
+                if (!file.type.match('image.*')) continue;
+
+                const newIcon = await imageToIcon$2(file);
+                localData.saveIcon(newIcon);
+            }
+            this.render();
+            this.uploadBlur(e);
+        },
+        addIcon: async function() {
+            const iconPath = prompt('Icon image url');
+            if (iconPath) {
+                try {
+                    await checkImage(iconPath);
+                    localData.saveIcon(iconPath);
+                    this.render();
+                } catch (e) {
+                    alert('failed to load image');
+                }
+            }
+        },
+        render: async function() {
+            this.el.querySelector('main').innerHTML = iconList$2.render().innerHTML;
+        },
+    });
+
+    var BaseMobModal = Component$1.define({
+        // Templates
+        className: 'modal',
+        template: (title, name, icon) => {
+            return `
+            <div class='spawn-controls' aria-modal="true" role="dialog">
+                <h2>${title}</h2>
+                <img src="${getIconImage(icon)}" data-id="${icon}">
+                <div>
+                    <label>Name</label>
+                    <input type="text" value="${name}" placeholder="Player name...">
+                    <input type='submit' value="Save">
+                </div>
+            </div>
+        `;
+        },
+        // Events
+        events: {
+            'click .modal': 'close',
+            'click img': 'openPickList',
+            'click input[type=submit]': 'save',
+            'keyup input[type=text]': 'detectSubmit',
+        },
+        // Save via keyboard
+        detectSubmit: function(e) {
+            if (e.key == 'Enter' || e.keyCode == 13) {
+                this.save();
+            }
+        },
+        // Remove modal
+        close: function() {
+            this.destroy();
+        },
+        // Open image picker
+        openPickList: function(e, target) {
+            ImagePicker$2.make({target});
+        },
+        focus: function(e) {
+            // Set focus to input
+            const input = this.el.querySelector('input[type=text]');
+            // Ensure selection is the end of the current value
+            input.selectionStart = input.selectionEnd = input.value.length;
+            input.focus();
+        },
+    });
+
+    var EditMobModal = BaseMobModal.define({
+        initialize: function(options) {
+            this.target = options.target;
+
+            // Render base template
+            this.el = this.tpl(
+                'Update Mob',
+                this.target.name,
+                this.target.icon,
+            );
+
+            // Create self on the global level as needed.
+            document.body.appendChild(this.el);
+            this.focus();
+        },
+        // Save data to target
+        save: function(e, target) {
+            this.target.name = this.el.querySelector('input[type=text]').value;
+            this.target.icon = this.el.querySelector('img').dataset.id;
+            this.close();
+        },
+    });
+
+    var ConfirmModal = Component$1.define({
+        callback: function() {},
+        initialize: function(options) {
+            this.callback = options.callback;
+
+            // Render base template
+            this.el = this.tpl(
+                options.question,
+            );
+
+            // Create self on the global level as needed.
+            document.body.appendChild(this.el);
+        },
+        // Events
+        events: {
+            'click button.cancel': 'close',
+            'click button.confirm': 'confirm',
+        },
+        // Templates
+        className: 'modal',
+        template: (question) => {
+            return `
+            <div class='confirm-modal'>
+                <h2>${question}</h2>
+                <div>
+                    <button class="confirm">Yes</button>
+                    <button class="cancel">No</button>
+                </div>
+            </div>
+        `;
+        },
+        // Save data to target
+        confirm: function(e, target) {
+            this.callback();
+            this.close();
+        },
+
+        // Remove modal
+        close: function() {
+            this.destroy();
+        },
+    });
+
+    /**
+     * Make Leaflet Marker
+     *
+     * @param  {[type]} position  [description]
+     * @return {[type]}      [description]
+     */
+    function makeMarker(position) {
+        return leafletSrc.marker(
+            position,
+            {
+                icon: leafletSrc.divIcon(),
+                draggable: true,
+            },
+        );
+    }
+
+    // Used to ensure bring to front always works.
+    let globalZIndexOffset = 0;
+
+    var Character = Component$1.define({
+        marker: null,
+        ref: null,
+        map: null,
+        // Events
+        events: {
+            'marker:click': 'bringToFront',
+            'marker:dblclick': 'characterDblClick',
+            'marker:dragstart': 'bringToFront',
+            'marker:dragend': 'characterDragend',
+            'marker:contextmenu': 'characterRemove',
+            'data:change': 'render',
+            'data:focus': 'panTo',
+        },
+        initialize: function({ref, map}) {
+            // Store key vals
+            this.ref = ref;
+            this.map = map;
+
+            // Set initial position if not already defined.
+            if (!this.ref.x || !this.ref.y) {
+                this.ref.x = map.getCenter().lng;
+                this.ref.y = map.getCenter().lat;
+            }
+
+            this.marker = makeMarker(
+                leafletSrc.latLng(this.ref.x, this.ref.y),
+            );
+
+            // Register events
+            this.marker.on('click', (e) => this.trigger('marker:click', e));
+            this.marker.on('dblclick', (e) => this.trigger('marker:dblclick', e));
+            this.marker.on('dragstart', (e) => this.trigger('marker:dragstart', e));
+            this.marker.on('dragend', (e) => this.trigger('marker:dragend', e));
+            this.marker.on('contextmenu', (e) => this.trigger('marker:contextmenu', e));
+
+            this.map.on('zoom', (e) => this.trigger('marker:zoom', e));
+            this.map.on('zoomend', (e) => this.trigger('marker:zoomend', e));
+            this.map.on('zoomstart', (e) => this.trigger('marker:zoomstart', e));
+
+            this.ref.on('update', (e) => this.trigger('data:change', e));
+            this.ref.on('focus', (e) => this.trigger('data:focus', e));
+
+            // Make icon
+            this.render();
+        },
+        template: (name, icon) => {
+            return `
+            <img src="${getIconImage(icon)}">
+            <span>${name}</span>
+        `;
+        },
+        panTo: function() {
+            this.map.panTo(this.marker.getLatLng());
+        },
+        bringToFront: function(event) {
+            event.preventDefault;
+            // Bring character to the front
+            globalZIndexOffset++;
+            this.marker.setZIndexOffset(globalZIndexOffset*1000);
+        },
+        characterDblClick: function(event) {
+            event.preventDefault;
+            EditMobModal.make({target: this.ref});
+        },
+        characterDragend: function(event) {
+            const latLng = event.target.getLatLng();
+            // Sync
+            this.ref.x = latLng.lat;
+            this.ref.y = latLng.lng;
+        },
+        characterRemove: function(event) {
+            event.preventDefault;
+
+            ConfirmModal.make({
+                question: `Remove ${this.ref.name} from map?`,
+                callback: () => {
+                    this.ref.spawned = false;
+                },
+            });
+        },
+        render: function() {
+            // Sync spawned?
+            if (!this.ref.spawned || this.ref.removed) {
+                this.marker.remove();
+            } else {
+                this.marker.addTo(this.map);
+            }
+
+            // Sync position
+            this.marker.setLatLng([this.ref.x, this.ref.y]);
+            // Sync icon
+            this.marker.setIcon(
+                leafletSrc.divIcon({
+                    className: 'character-icon',
+                    html: this.tpl(this.ref.name, this.ref.icon),
+                    iconSize: [60, 80],
+                    iconAnchor: [35, 35],
+                }),
+            );
+        },
+    });
+
+    /**
+     * Create a polygon to represent a circle of a given size
+     *
+     * @param  {[type]} center [description]
+     * @param  {[type]} radius [description]
+     * @return {[type]}        [description]
+     */
     function circleToPolygon(center, radius) {
-      const n = 20;
-      const angles = 2 * Math.PI / n;
-      const coordinates = [];
+        const n = 20;
+        const angles = 2 * Math.PI / n;
+        const coordinates = [];
 
-      for (let i = 0; i < n; i++) {
-        const x = center[0] + radius * Math.cos(i * angles);
-        const y = center[1] + radius * Math.sin(i * angles);
-        coordinates.push([x, y]);
-      }
+        for (let i = 0; i < n; i++) {
+            const x = center[0] + radius * Math.cos(i * angles);
+            const y = center[1] + radius * Math.sin(i * angles);
+            coordinates.push([x, y]);
+        }
 
-      // Form valid poly line by adding first to the end
-      coordinates.push(coordinates[0]);
+        // Form valid poly line by adding first to the end
+        coordinates.push(coordinates[0]);
 
-      return coordinates;
+        return coordinates;
     }
 
     /**
@@ -14605,31 +15642,6 @@
             coordinates: coordinates,
         };
         return feature(geom, properties, options);
-    }
-
-    /**
-     * Get Geometry from Feature or Geometry Object
-     *
-     * @param {Feature|Geometry} geojson GeoJSON Feature or Geometry Object
-     * @returns {Geometry|null} GeoJSON Geometry Object
-     * @throws {Error} if geojson is not a Feature or Geometry Object
-     * @example
-     * var point = {
-     *   "type": "Feature",
-     *   "properties": {},
-     *   "geometry": {
-     *     "type": "Point",
-     *     "coordinates": [110, 40]
-     *   }
-     * }
-     * var geom = turf.getGeom(point)
-     * //={"type": "Point", "coordinates": [110, 40]}
-     */
-    function getGeom(geojson) {
-        if (geojson.type === "Feature") {
-            return geojson.geometry;
-        }
-        return geojson;
     }
 
     /**
@@ -17020,7 +18032,7 @@
 
     var operation = new Operation();
 
-    var union = function union(geom) {
+    var union$1 = function union(geom) {
       for (var _len = arguments.length, moreGeoms = new Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
         moreGeoms[_key - 1] = arguments[_key];
       }
@@ -17044,7 +18056,7 @@
       return operation.run('xor', geom, moreGeoms);
     };
 
-    var difference = function difference(subjectGeom) {
+    var difference$1 = function difference(subjectGeom) {
       for (var _len4 = arguments.length, clippingGeoms = new Array(_len4 > 1 ? _len4 - 1 : 0), _key4 = 1; _key4 < _len4; _key4++) {
         clippingGeoms[_key4 - 1] = arguments[_key4];
       }
@@ -17053,11 +18065,36 @@
     };
 
     var index = {
-      union: union,
+      union: union$1,
       intersection: intersection$1,
       xor: xor,
-      difference: difference
+      difference: difference$1
     };
+
+    /**
+     * Get Geometry from Feature or Geometry Object
+     *
+     * @param {Feature|Geometry} geojson GeoJSON Feature or Geometry Object
+     * @returns {Geometry|null} GeoJSON Geometry Object
+     * @throws {Error} if geojson is not a Feature or Geometry Object
+     * @example
+     * var point = {
+     *   "type": "Feature",
+     *   "properties": {},
+     *   "geometry": {
+     *     "type": "Point",
+     *     "coordinates": [110, 40]
+     *   }
+     * }
+     * var geom = turf.getGeom(point)
+     * //={"type": "Point", "coordinates": [110, 40]}
+     */
+    function getGeom(geojson) {
+        if (geojson.type === "Feature") {
+            return geojson.geometry;
+        }
+        return geojson;
+    }
 
     /**
      * Finds the difference between two {@link Polygon|polygons} by clipping the second polygon from the first.
@@ -17093,7 +18130,7 @@
      * //addToMap
      * var addToMap = [polygon1, polygon2, difference];
      */
-    function difference$1(polygon1, polygon2) {
+    function difference(polygon1, polygon2) {
       var geom1 = getGeom(polygon1);
       var geom2 = getGeom(polygon2);
       var properties = polygon1.properties || {};
@@ -17115,7 +18152,7 @@
      * @param {Feature<Polygon|MultiPolygon>} polygon2 Polygon feature to difference from polygon1
      * @param {Object} [options={}] Optional Parameters
      * @param {Object} [options.properties={}] Translate Properties to output Feature
-     * @returns {Feature<(Polygon|MultiPolygon)>} a combined {@link Polygon} or {@link MultiPolygon} feature
+     * @returns {Feature<(Polygon|MultiPolygon)>} a combined {@link Polygon} or {@link MultiPolygon} feature, or null if the inputs are empty
      * @example
      * var poly1 = turf.polygon([[
      *     [-82.574787, 35.594087],
@@ -17137,7 +18174,7 @@
      * //addToMap
      * var addToMap = [poly1, poly2, union];
      */
-    function union$1(poly1, poly2, options) {
+    function union(poly1, poly2, options) {
         if (options === void 0) { options = {}; }
         var geom1 = getGeom(poly1);
         var geom2 = getGeom(poly2);
@@ -17150,975 +18187,621 @@
             return multiPolygon(unioned, options.properties);
     }
 
+    /**
+     * Convert multi polygon geojson to array of lat/lng pairs
+     *
+     * @param  {[type]} mpoly [description]
+     * @return {[type]}       [description]
+     */
     function mployToPairs(mpoly) {
-      return mpoly.map((poly) => {
-        if (poly.lat) return [poly.lat, poly.lng];
+        return mpoly.map((poly) => {
+            if (poly.lat) return [poly.lat, poly.lng];
 
-        return mployToPairs(poly);
-      });
+            return mployToPairs(poly);
+        });
     }
 
-    // Keep track of cut out sections
-    var fog = new function() {
-      this.cutouts = null;
+    /**
+     * Keep track of cut out sections
+     * @return {[type]} [description]
+     */
+    var fog$1 = new function() {
+        this.cutouts = null;
 
-      this.loadCutOuts = function(multipolys) {
-        // Load cutouts from restore.
-        //
-        // This data is the drawn multipoly of the leaflet mask
-        // so we need to strip off the outer mask (as we don't deal with
-        // that here) and the convert the poly or multipolys from leaflet
-        // latLngs to [lat,lng] pairs.
-        multipolys.shift();
-        this.cutouts = mployToPairs(multipolys);
+        this.loadCutOuts = function(multipolys) {
+            // Load cutouts from restore.
+            //
+            // This data is the drawn multipoly of the leaflet mask
+            // so we need to strip off the outer mask (as we don't deal with
+            // that here) and the convert the poly or multipolys from leaflet
+            // latLngs to [lat,lng] pairs.
+            multipolys.shift();
+            this.cutouts = mployToPairs(multipolys);
 
-        return this.cutouts;
-      };
+            return this.cutouts;
+        };
 
-      this.addCutOut = function(poly) {
-        if (!this.cutouts) {
-          this.cutouts = [poly];
-          return this.cutouts;
-        }
-        const cutoutPoly = multiPolygon(this.cutouts);
-        const newPoly = polygon([poly]);
-        const u = union$1(cutoutPoly, newPoly);
+        this.addCutOut = function(poly) {
+            if (!this.cutouts) {
+                this.cutouts = [poly];
+                return this.cutouts;
+            }
+            const cutoutPoly = multiPolygon(this.cutouts);
+            const newPoly = polygon([poly]);
+            const u = union(cutoutPoly, newPoly);
 
-        this.cutouts = u.geometry.coordinates;
+            this.cutouts = u.geometry.coordinates;
 
-        return this.cutouts;
-      };
+            return this.cutouts;
+        };
 
-      this.removeCutOut = function(poly) {
-        const cutoutPoly = multiPolygon(this.cutouts);
-        const newPoly = polygon([poly]);
+        this.removeCutOut = function(poly) {
+            const cutoutPoly = multiPolygon(this.cutouts);
+            const newPoly = polygon([poly]);
 
-        const u = difference$1(cutoutPoly, newPoly);
+            const u = difference(cutoutPoly, newPoly);
 
-        // Handle null if no difference found (ie. we cleared it all)
-        if (!u) {
-          return this.cutouts = [];
-        }
+            // Handle null if no difference found (ie. we cleared it all)
+            if (!u) {
+                return this.cutouts = [];
+            }
 
-        return this.cutouts = u.geometry.coordinates;
-      };
+            return this.cutouts = u.geometry.coordinates;
+        };
     }();
 
     leafletSrc.Fog = leafletSrc.Rectangle.extend({
-      options: {
-        stroke: false,
-        color: '#111',
-        fillOpacity: 0.7,
-        clickable: false,
-      },
-      initialize: function(bounds, options) {
-        leafletSrc.Polygon.prototype.initialize.call(this, [this._boundsToLatLngs(bounds)], options);
-      },
-      initFog: function(mask) {
-        // Load mask back to fog format & apply it from reload
-        const newFog = fog.loadCutOuts(mask);
-        this.applyFog(newFog);
-      },
-      clearFog: function(latLng, size = 36) {
-        // Get area Poly
-        const areaPoly = circleToPolygon([latLng.lat, latLng.lng], size);
-        const cutouts = fog.addCutOut(areaPoly);
+        options: {
+            stroke: false,
+            color: '#111',
+            fillOpacity: 0.7,
+            clickable: false,
+        },
+        initialize: function(bounds, options) {
+            // Offset bounds so fog boundry isn't in view
+            bounds._northEast.lat +=300;
+            bounds._northEast.lng +=300;
+            bounds._southWest.lat -=300;
+            bounds._southWest.lng -=300;
+            leafletSrc.Polygon.prototype.initialize.call(this, [this._boundsToLatLngs(bounds)], options);
+        },
+        initFog: function(mask) {
+            // Load mask back to fog format & apply it from reload
+            const newFog = fog$1.loadCutOuts(mask);
+            this.applyFog(newFog);
+        },
+        clearFog: function(latLng, size = 36) {
+            // Get area Poly
+            const areaPoly = circleToPolygon([latLng.lat, latLng.lng], size);
+            const cutouts = fog$1.addCutOut(areaPoly);
 
-        return this.applyFog(cutouts);
-      },
-      addFog: function(latLng, size = 36) {
-        const areaPoly = circleToPolygon([latLng.lat, latLng.lng], size);
-        const cutouts = fog.removeCutOut(areaPoly);
+            return this.applyFog(cutouts);
+        },
+        addFog: function(latLng, size = 36) {
+            const areaPoly = circleToPolygon([latLng.lat, latLng.lng], size);
+            const cutouts = fog$1.removeCutOut(areaPoly);
 
-        return this.applyFog(cutouts);
-      },
-      setOpacity: function(opacity) {
-        this.setStyle({fillOpacity: opacity});
-      },
-      applyFog: function(cutouts) {
-        this._latlngs = [this._latlngs[0]];
-        cutouts.map((value, index) => {
-          this._latlngs[index + 1] = this._convertLatLngs(value);
-        });
-        return this.redraw();
-      },
+            return this.applyFog(cutouts);
+        },
+        setOpacity: function(opacity) {
+            this.setStyle({fillOpacity: opacity});
+        },
+        applyFog: function(cutouts) {
+            this._latlngs = [this._latlngs[0]];
+            cutouts.map((value, index) => {
+                this._latlngs[index + 1] = this._convertLatLngs(value);
+            });
+            return true;
+        },
     });
 
     leafletSrc.fog = function(bounds, options) {
-      return new leafletSrc.Fog(bounds, options);
+        return new leafletSrc.Fog(bounds, options);
     };
 
+    /**
+     * Create fog layer
+     *
+     * @param  {[type]} map [description]
+     * @return {[type]}     [description]
+     */
     function fogOfWar(map) {
-      // Create fog of war mask
-      return leafletSrc.fog(map.getBounds()).addTo(map);
+        // Create fog of war mask
+        return leafletSrc.fog(map.getBounds()).addTo(map);
     }
 
-    function safeText(text) {
-      // Render as text node
-      const html = document.createElement('p');
-      html.appendChild(document.createTextNode(text));
-      return html.innerHTML;
-    }
+    /**
+     * Create leaflet map instance based on provided image
+     *
+     * @param  {[type]} target  [description]
+     * @param  {[type]} mapPath [description]
+     * @return {[type]}         [description]
+     */
+    async function createMap(target, mapPath) {
+        const img = await checkImage(mapPath);
 
-    function Template(methods) {
-      this.render = function(...args) {
-        // Escape input values
-        if (methods.safe !== false) {
-          // Ensure args are safe
-          args = args.map((value) => {
-            return safeText(value);
-          });
-        }
-
-        // Render template itself
-        const container = document.createElement('div');
-        const tpl = methods.template(...args);
-        container.innerHTML = tpl;
-
-        if (methods.className) {
-          container.className = methods.className;
-        }
-
-        // Return element
-        return container;
-      };
-    }
-
-    let allocated = 0;
-
-    function uid() {
-      return (new Date().getTime()) + '_' + (allocated++);
-    }
-
-    var localData = new function() {
-      const storage = window.localStorage;
-      const mapPrefix = 'map:';
-
-      this.hasMap = function(key) {
-        return (storage.getItem(mapPrefix + key));
-      };
-
-      this.loadMap = function(key) {
-        return JSON.parse(storage.getItem(mapPrefix + key));
-      };
-
-      this.saveMap = function(key, data) {
-        return storage.setItem(mapPrefix + key, JSON.stringify(data));
-      };
-
-      this.getMaps = function() {
-        return Object.keys(storage).filter((x) => {
-          return x.startsWith('map:');
+        // Create map
+        const map = leafletSrc.map(target, {
+            crs: leafletSrc.CRS.Simple,
+            zoomSnap: 0.20,
         });
-      };
 
-      this.getIcons = function() {
-        const icons = JSON.parse(storage.getItem('icons'));
-        return (icons) || {};
-      };
+        // Config map size
+        const width = Math.round(img.width / 10);
+        const height = Math.round(img.height / 10);
+        const bounds = [[0, 0], [height, width]];
 
-      this.getIcon = function(id) {
-        const icons = this.getIcons();
-        return icons[id];
-      };
+        leafletSrc.imageOverlay(mapPath, bounds).addTo(map);
+        map.fitBounds(bounds);
 
-      this.saveIcon = function(iconPath) {
-        const icons = this.getIcons();
-        icons['icon:' + uid()] = iconPath;
-        storage.setItem('icons', JSON.stringify(icons));
-      };
+        // Config defualt map zoom.
+        const zoom = map.getZoom();
+        map.setZoom(zoom + 0.5);
+        map.setMaxZoom(zoom + 4);
+        map.setMinZoom(zoom - 0.5);
 
-      this.removeIcon = function() {
-
-      };
-
-      this.setPlayers = function(players) {
-        storage.setItem('players', JSON.stringify(players));
-      };
-
-      this.getPlayers = function() {
-        const players = JSON.parse(storage.getItem('players'));
-        return players || null;
-      };
-    };
-
-    // Player icons
-    const playerIcons = 9;
-    const monsterIcons = 33;
-    let iconPath = 'assets/';
-
-    const iconList = []; const monsterList = [];
-
-    for (let i = 1; i <= playerIcons; i++) iconList.push('p:' + i);
-    for (let i = 1; i <= monsterIcons; i++) monsterList.push('m:' + i);
-
-    // Get all player icons
-    const getPlayerIcons = function() {
-      return iconList;
-    };
-    // Get all monster icons
-    const getMonsterIcons = function() {
-      return monsterList;
-    };
-
-    // Get all custom icons
-    const getCustomIcons = function() {
-      return Object.keys(localData.getIcons());
-    };
-
-    // Get random player icon
-    const getRandomPlayerIcon = function() {
-      return iconList[Math.floor((Math.random() * iconList.length))];
-    };
-
-    // Get random monster icon
-    const getRandomMonsterIcon = function() {
-      return monsterList[Math.floor((Math.random() * monsterList.length))];
-    };
-
-    // Get player icons as unique list
-    const getRandomPlayerIconList = function() {
-      // No point using a smarter algo for 8 elements.
-      return iconList.sort(() => Math.random() - 0.5);
-    };
-
-    // Change icon path if being used via another app
-    const setIconPath = function(path) {
-      iconPath = path;
-    };
-
-    // Convert icon to image path
-    function getIconImage(icon) {
-      if (!icon) {
-        return '';
-      }
-
-      if (icon.startsWith('icon:')) {
-        return localData.getIcon(icon);
-      }
-      if (icon.startsWith('p:')) {
-        return `${iconPath}players/${icon.substr(2)}.png`;
-      }
-      if (icon.startsWith('m:')) {
-        return `${iconPath}monsters/${icon.substr(2)}.png`;
-      }
-
-      return icon;
+        return map;
     }
 
-    const iconTpl = new Template({
-      template: (name, icon) => {
-        return `
-        <img src="${getIconImage(icon)}">
-        <span>${name}</span>
-    `;
-      },
-    });
+    var WarningModal = Component$1.define({
+        callback: function() {},
+        initialize: function(options) {
+            this.callback = options.callback;
 
-    function makeIcon(name, icon) {
-      return leafletSrc.divIcon({
-        className: 'character-icon',
-        html: iconTpl.render(name, icon),
-        iconSize: [60, 80],
-        iconAnchor: [35, 35],
-      });
-    }
+            // Render base template
+            this.el = this.tpl(
+                options.notice,
+                options.explanation
+            );
 
-    function makeMarker(ref, icon, map) {
-      const position = (ref.x) ? leafletSrc.latLng(ref.x, ref.y) : map.getCenter();
-      return leafletSrc.marker(
-          position,
-          {
-            icon: icon,
-            draggable: true,
-          },
-      );
-    }
-
-    var Character = Component$1.define({
-      marker: null,
-      icon: null,
-      ref: null,
-      map: null,
-      events: {
-        'marker:click': 'characterClick',
-        'marker:dblclick': 'characterDblClick',
-        'marker:dragend': 'characterDragend',
-        'marker:contextmenu': 'characterRemove',
-      },
-      initialize: function({ref, map}) {
-        // Store key vals
-        this.ref = ref;
-        this.map = map;
-        this.icon = makeIcon(ref.name, ref.icon);
-        this.marker = makeMarker(ref, this.icon, map);
-
-        // Register events
-        this.marker.on('click', (e) => this.trigger('marker:click', e));
-        this.marker.on('dblclick', (e) => this.trigger('marker:dblclick', e));
-        this.marker.on('dragend', (e) => this.trigger('marker:dragend', e));
-        this.marker.on('contextmenu', (e) => this.trigger('marker:contextmenu', e));
-        this.render();
-      },
-      panTo: function() {
-        this.map.panTo(this.marker.getLatLng());
-      },
-      characterClick: function(event) {
-        event.preventDefault;
-        console.log('click me');
-      },
-      characterDblClick: function(event) {
-        event.preventDefault;
-        // Going old school for now
-        const name = prompt('Rename?', this.ref.name);
-        if (name) {
-          event.target._icon.querySelector('span').innerText = this.ref.name = name;
-        }
-      },
-      characterDragend: function(event) {
-        const latLng = event.target.getLatLng();
-        // Sync
-        this.ref.x = latLng.lat;
-        this.ref.y = latLng.lng;
-      },
-      characterRemove: function(event) {
-        event.preventDefault;
-        if (confirm('Are you sure you want to remove this character?')) {
-          this.ref.spawned = false;
-          this.marker.remove();
-        }
-      },
-      render: function() {
-        // Add to map
-        this.marker.addTo(this.map);
-      },
+            // Create self on the global level as needed.
+            document.body.appendChild(this.el);
+        },
+        // Events
+        events: {
+            'click button.confirm': 'confirm',
+        },
+        // Templates
+        className: 'modal',
+        template: (notice, explanation) => {
+            return `
+            <div class='confirm-modal'>
+                <h2>${notice}</h2>
+                ${explanation ? `<p>${explanation}</p>` : ''}
+                <div>
+                    <button class="confirm">Okay</button>
+                </div>
+            </div>
+        `;
+        },
+        // Save data to target
+        confirm: function(e, target) {
+            this.callback();
+            this.close();
+        },
     });
 
     const playerToIconMap = {};
     const npcToIconMap = {};
 
+    /**
+     * Map Component
+     *
+     * @param  {[type]}
+     * @return {Component}
+     */
     var EncounterMap = Component$1.define({
-      map: null,
-      fog: null,
-      initialize: function(config) {
-        this.el = document.querySelector(config.options.container);
-        this.render();
-      },
-      events: {
-        'map:player:spawn': 'spawnPlayer',
-        'map:player:focus': 'focusPlayer',
-        'map:spawn': 'spawnNpc',
-        'update:fog.enabled': 'fogToggled',
-        'update:fog.opacity': 'fogOpacityChanged',
-      },
-      spawnPlayer: function(player) {
-        const marker = this.generateMarker(player.name, player.icon, player);
-        playerToIconMap[player.id] = marker;
-        player.spawned = true;
-      },
-      spawnNpc: function(npc) {
-        const marker = this.generateMarker(npc.name, npc.icon, npc);
-        npcToIconMap[npc.id] = marker;
-        npc.spawned = true;
-      },
-      generateMarker: function(name, img, ref) {
-        return Character.make({ref: ref, map: this.map});
-      },
-      focusPlayer: function(player) {
-        playerToIconMap[player.id].panTo();
-      },
-      fogToggled: function(newValue) {
-        if (newValue) {
-          this.fog.setLatLngs(JSON.parse(this.options.fog.mask));
-        } else {
-          this.options.fog.mask = JSON.stringify(this.fog.getLatLngs());
-          this.fog.setLatLngs(false);
-        }
-      },
-      fogOpacityChanged: function(newValue) {
-        this.fog.setOpacity(newValue / 100);
-      },
-      render: async function() {
-        // Grab image from URL
-        this.map = await createMap('map', this.options.map);
-        this.fog = fogOfWar(this.map);
+        map: null,
+        fog: null,
+        // Setup
+        initialize: async function(config) {
+            // SetID
+            this.el.id = 'map';
+            this.options = config.state;
 
-        this.map.on('click', (e) => {
-          if (!this.options.fog.enabled) return;
+            // Setup map itself
+            try {
+                this.map = await createMap('map', this.options.get('map'));
+            } catch (e) {
+                // Fatal error, map cannot be loaded. Abort and show error.
+                return WarningModal.make({
+                    notice: "Unable to load map image",
+                    explanation: "The map URL you have provided can not be loaded. Please check that the URL is correct and refers directly to the map image you would like to use.",
+                    callback: (e) => { window.location.href = window.location.pathname; }
+                });
+            }
+            this.fog = fogOfWar(this.map);
 
-          this.fog.clearFog(e.latlng, this.options.fog.clearSize);
-          this.options.fog.mask = JSON.stringify(this.fog.getLatLngs());
-        });
-        this.map.on('contextmenu', (e) => {
-          if (!this.options.fog.enabled) return;
+            // Register leaflet Listeners
+            this.map.on('click', (e) => this.trigger('map:click', e));
+            this.map.on('contextmenu', (e) => this.trigger('map:contextmenu', e));
 
-          this.fog.addFog(e.latlng, this.options.fog.clearSize);
-          this.options.fog.mask = JSON.stringify(this.fog.getLatLngs());
-        });
+            // Listen to model
+            this.subscribeTo(config.state);
 
-        this.reloadData();
-      },
-      reloadData: function() {
-        // Reload save data
-        // Load config from settings
-        if (!this.options.fog.mask) {
-          this.options.fog.mask = JSON.stringify(this.fog.getLatLngs());
-        } else {
-          this.fog.initFog(JSON.parse(this.options.fog.mask));
-        }
+            // Pass model eventing
+            this.render();
+        },
+        // Events
+        events: {
+            // Local events
+            'map:click': 'fogClear',
+            'map:contextmenu': 'fogAdd',
+            // mob data listeners
+            'create:players.*': 'spawnPlayer',
+            'create:spawns.*': 'spawnNpc',
+            // fog data listeners
+            'update:fog.mask': 'fogMaskUpdated',
+            'update:fog.enabled': 'fogToggled',
+            'update:fog.opacity': 'fogOpacityChanged',
+        },
+        fogMaskUpdated: function(mask) {
+            // Import new mask
+            this.fog.initFog(JSON.parse(mask));
+            // Redraw fog only when change has been detected.
+            this.fog.redraw();
+        },
+        // Map actions
+        spawnPlayer: function(player) {
+            const marker = this.generateMarker(player.name, player.icon, player);
+            playerToIconMap[player.id] = marker;
+        },
+        spawnNpc: function(npc) {
+            const marker = this.generateMarker(npc.name, npc.icon, npc);
+            npcToIconMap[npc.id] = marker;
+        },
+        generateMarker: function(name, img, ref) {
+            return Character.make({ref: ref, map: this.map});
+        },
+        fogToggled: function(newValue) {
+            if (newValue) {
+                this.fog.setLatLngs(JSON.parse(this.options.get('fog.mask')));
+            } else {
+                this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
+                this.fog.setLatLngs(false);
+            }
+        },
+        fogOpacityChanged: function(newValue) {
+            this.fog.setOpacity(newValue / 100);
+        },
+        fogClear: function(e) {
+            if (!this.options.get('fog.enabled')) return;
 
-        this.fogOpacityChanged(this.options.fog.opacity);
-        this.fogToggled(this.options.fog.enabled);
+            this.fog.clearFog(e.latlng, this.options.get('fog.clearSize'));
+            this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
+        },
+        fogAdd: function(e) {
+            if (!this.options.get('fog.enabled')) return;
 
-        // Boot players
-        for (const player of Object.values(this.options.players)) {
-          if (player.spawned) {
-            this.trigger('map:player:spawn', player);
-          }
-        }
-        // Boot spawns
-        for (const spawn of Object.values(this.options.spawns)) {
-          if (spawn.spawned) this.trigger('map:spawn', spawn);
-        }
-      },
+            this.fog.addFog(e.latlng, this.options.get('fog.clearSize'));
+            this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
+        },
+        fogRefresh: function() {
+            this.fog.initFog(JSON.parse(this.options.get('fog.mask')));
+        },
+        // Render changes
+        render: function() {
+            // Reload save data
+            // Load config from settings
+            if (!this.options.get('fog.mask')) {
+                this.options.data.fog.mask = JSON.stringify(this.fog.getLatLngs());
+            } else {
+                this.fogRefresh();
+            }
+
+            this.fogOpacityChanged(this.options.get('fog.opacity'));
+            this.fogToggled(this.options.get('fog.enabled'));
+
+            // Boot players
+            for (const player of Object.values(this.options.get('players'))) {
+                this.spawnPlayer(player);
+            }
+            // Boot spawns
+            for (const spawn of Object.values(this.options.get('spawns'))) {
+                this.spawnNpc(spawn);
+            }
+        },
     });
 
     let selected = null;
 
+    /**
+     * [dragOver description]
+     * @param  {[type]} e [description]
+     */
     function dragOver(e) {
-      if (isBefore(selected, e.target)) {
-        e.target.parentNode.insertBefore(selected, e.target);
-      } else {
-        e.target.parentNode.insertBefore(selected, e.target.nextSibling);
-      }
-    }
-
-    function dragEnd() {
-      selected = null;
-    }
-
-    function dragStart(e) {
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', null);
-      selected = e.target;
-    }
-
-    function isBefore(el1, el2) {
-      let cur;
-      if (el2.parentNode === el1.parentNode) {
-        for (cur = el1.previousSibling; cur; cur = cur.previousSibling) {
-          if (cur === el2) return true;
+        if (isBefore(selected, e.target)) {
+            e.target.parentNode.insertBefore(selected, e.target);
+        } else {
+            e.target.parentNode.insertBefore(selected, e.target.nextSibling);
         }
-      }
-      return false;
     }
 
-    function dragSort(elements) {
-      Array.from(elements).map((el) => {
+    /**
+     * [dragEnd description]
+     */
+    function dragEnd() {
+        selected = null;
+    }
+
+    /**
+     * [dragStart description]
+     * @param  {[type]} e [description]
+     */
+    function dragStart(e) {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', null);
+        selected = e.target;
+    }
+
+    /**
+     * [isBefore description]
+     * @param  {[type]}  el1 [description]
+     * @param  {[type]}  el2 [description]
+     * @return {boolean}
+     */
+    function isBefore(el1, el2) {
+        let cur;
+        if (el2.parentNode === el1.parentNode) {
+            for (cur = el1.previousSibling; cur; cur = cur.previousSibling) {
+                if (cur === el2) return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * [description]
+     * @param  {[type]} el [description]
+     */
+    function dragSort(el) {
         el.addEventListener('dragend', dragEnd);
         el.addEventListener('dragstart', dragStart);
         el.addEventListener('dragover', dragOver);
         el.draggable = true;
-      });
     }
+
+    var NewPlayerModal = BaseMobModal.define({
+        // Setup
+        initialize: function(options) {
+            this.players = options.players;
+
+            // Render base template
+            const defaultIcon = getRandomPlayerIcon();
+            this.el = this.tpl(
+                'Add Player',
+                '',
+                defaultIcon,
+            );
+
+            // Create self on the global level as needed.
+            document.body.appendChild(this.el);
+            this.focus();
+        },
+        // Save data to target
+        save: function(e, target) {
+            this.players.push({
+                name: this.el.querySelector('input[type=text]').value,
+                icon: this.el.querySelector('img').dataset.id,
+                spawned: true,
+            });
+
+            this.close();
+        },
+    });
 
     const playerMap = new WeakMap();
 
-    const playerTpl = new Template({
-      template: (name, icon) => {
-        return `
-        <img src="${getIconImage(icon)}">
-        <span>${name}</span>
-    `;
-      },
-    });
-
     var Players = Component$1.define({
-      initialize: function(config) {
-        this.el = document.querySelector(config.options.playerBar);
-        this.render();
-      },
-      events: {
-        'click div': 'playerSelect',
-      },
-      playerSelect: function(e, target) {
-        const player = playerMap.get(target);
+        initialize: function(config) {
+            // Config player bar.
+            this.el.id = 'player-bar';
+            this.players = config.players;
+            this.players.on('create:*', (e) => this.trigger('player:added', e));
 
-        // Spawn em to map if we want em
-        if (!player.spawned) {
-          this.trigger('map:player:spawn', player);
-          return;
-        }
+            this.render();
+        },
+        events: {
+            'click div': 'onPlayerSelect',
+            'dblclick div': 'onEdit',
+            'contextmenu div': 'onRemove',
+            'click div.newPlayer span': 'onNewPlayer',
+            'player:added': 'makePlayerCard',
+        },
+        template: (name, icon) => {
+            return `
+            <img src="${getIconImage(icon)}">
+            <span>${name}</span>
+        `;
+        },
+        onEdit: function(e, target) {
+            const player = playerMap.get(target);
+            EditMobModal.make({target: player});
+        },
+        onRemove: function(e, target) {
+            e.preventDefault();
 
-        // If already spawned lets focus them
-        this.trigger('map:player:focus', player);
-      },
-      render: async function() {
-        this.options.players.map((player, index) => {
-          const playerToken = playerTpl.render(player.name, player.icon);
-          playerMap.set(playerToken, player);
+            const player = playerMap.get(target);
+            ConfirmModal.make({
+                question: 'Remove player from lineup?',
+                callback: () => {
+                    player.removed = true;
+                },
+            });
+        },
+        onNewPlayer: function() {
+            NewPlayerModal.make({players: this.players});
+        },
+        onPlayerSelect: function(e, target) {
+            const player = playerMap.get(target);
 
-          playerToken.setAttribute('title', player.name);
-
-          if (player.spawned) playerToken.classList.add('spawned');
-
-          // Listen for name changes
-          this.bus.on(`update:players.${index}.name`, (newName) => {
-            playerToken.querySelector('span').innerText = newName;
-            playerToken.setAttribute('title', newName);
-          });
-
-          this.bus.on(`update:players.${index}.spawned`, (spawned) => {
-            if (spawned) {
-              playerToken.classList.add('spawned');
-            } else {
-              playerToken.classList.remove('spawned');
+            // Spawn em to map if we want em
+            if (!player.spawned) {
+                player.spawned = true;
+                return;
             }
-          });
 
-          this.el.appendChild(playerToken);
-        });
+            player.trigger('focus');
+        },
+        makePlayerCard: function(player) {
+            // Skip removed players
+            if (player.removed) return;
 
-        dragSort(this.el.children);
-      },
+            const playerCard = this.tpl(player.name, player.icon);
+            playerMap.set(playerCard, player);
+
+            // Set default attrs
+            playerCard.setAttribute('title', player.name);
+            if (player.spawned) playerCard.classList.add('spawned');
+
+            // Insert before the "add new" if needed
+            const addCard = this.el.querySelector('.newPlayer');
+            if (addCard) {
+                this.el.insertBefore(playerCard, addCard);
+            } else {
+                this.el.appendChild(playerCard);
+            }
+
+            // Makes sortable
+            dragSort(playerCard);
+
+            // Listen for changes
+            player.on(`update:name`, (newName) => {
+                playerCard.querySelector('span').innerText = newName;
+                playerCard.setAttribute('title', newName);
+            });
+            player.on(`update:icon`, (newIcon) => {
+                playerCard.querySelector('img').src = getIconImage(newIcon);
+            });
+
+            // If card removed, remove it
+            player.on(`create:removed`, (newValue) => {
+                if (newValue) playerCard.remove();
+            });
+
+            // Listen for spawn changes
+            player.on(`update:spawned`, (spawned) => {
+                if (spawned) {
+                    playerCard.classList.add('spawned');
+                } else {
+                    playerCard.classList.remove('spawned');
+                }
+            });
+        },
+        render: async function() {
+            this.players.map((player) => {
+                this.makePlayerCard(player);
+            });
+
+            const newEl = document.createElement('div');
+            newEl.className = 'newPlayer';
+            newEl.innerHTML ='<span>+</span><span>Add</span>';
+            this.el.appendChild(newEl);
+        },
     });
 
-    const controlTpl = function(fogProps) {
-      const tpl = `
-        <label>
-            <span>Fog opacity</span>
-            <input type="range" min="1" max="100" value="${fogProps.opacity}" name='opacity'>
-        </label>
-        <label>
-            <span>Fog clear size</span>
-            <input type="range" min="1" max="100" value="${fogProps.clearSize}" name='clearSize'>
-        </label>
-        <label class="enable">
-            <span>Fog enabled</span>
-            <span class="toggle">
-                <input type="checkbox" name='enabled' checked>
-                <span></span>
-          </span>
-        </label>
-    `;
-      const template = document.createElement('div');
-      template.innerHTML = tpl;
-      return template;
-    };
-
+    /**
+     * Fog Control Component.
+     * Allows user to control clear sizing, fog opacity and other related settings.
+     *
+     */
     var FogControls = Component$1.define({
-      initialize: function(options) {
-        this.el = controlTpl(this.fogProps);
-        this.el.className = 'fog-controls';
-        this.el.style.display = 'none';
-        document.body.appendChild(this.el);
-      },
-      prop: {
-        visible: false,
-      },
-      events: {
-        'click input[name=enabled]': 'toggleFog',
-        'change input[name=opacity]': 'changeOpacity',
-        'change input[name=clearSize]': 'changeClearSize',
-      },
-      toggleFog: function(e, target) {
-        this.fogProps.enabled = target.checked;
-      },
-      changeOpacity: function(e, target) {
-        this.fogProps.opacity = target.value;
-      },
-      changeClearSize: function(e, target) {
-        this.fogProps.clearSize = target.value;
-      },
-      toggle: function() {
-        this.prop.visible = !this.prop.visible;
-        this.render();
-      },
-      show: function() {
-        this.prop.visible = true;
-        this.render();
-      },
-      hide: function() {
-        this.prop.visible = false;
-        this.render();
-      },
-      render: async function() {
-        if (this.prop.visible) {
-          this.el.style.display = 'flex';
-        } else {
-          this.el.style.display = 'none';
-        }
-      },
-    });
+        initialize: function(options) {
+            // Config template
+            this.el = this.tpl(this.fogProps.opacity, this.fogProps.clearSize);
+            this.el.style.display = 'none';
 
-    const controlTpl$1 = new Template({
-      template: () => {
-        return `
-      <main></main>
-      <footer><button>Cancel</button></footer>
-    `;
-      },
+            // Create self on parent
+            document.body.appendChild(this.el);
+        },
+        // Events
+        events: {
+            'click input[name=enabled]': 'toggleFog',
+            'change input[name=opacity]': 'changeOpacity',
+            'change input[name=clearSize]': 'changeClearSize',
+        },
+        // Template
+        className: 'fog-controls',
+        template: (opacity, clearSize) => {
+            return `
+            <h2>Fog settings</h2>
+            <div>
+            <label>
+                <span>Fog opacity</span>
+                <input type="range" min="1" max="100" value="${opacity}" name='opacity'>
+            </label>
+            <label>
+                <span>Fog clear size</span>
+                <input type="range" min="1" max="100" value="${clearSize}" name='clearSize'>
+            </label>
+            <label class="enable">
+                <span>Fog enabled</span>
+                <span class="toggle">
+                    <input type="checkbox" name='enabled' checked>
+                    <span></span>
+              </span>
+            </label>
+            </div>
+        `;
+        },
+        prop: {
+            visible: false,
+        },
+        // Actions
+        toggleFog: function(e, target) {
+            this.fogProps.enabled = target.checked;
+        },
+        changeOpacity: function(e, target) {
+            this.fogProps.opacity = target.value;
+        },
+        changeClearSize: function(e, target) {
+            this.fogProps.clearSize = target.value;
+        },
+        toggle: function() {
+            this.prop.visible = !this.prop.visible;
+            this.render();
+        },
+        show: function() {
+            this.prop.visible = true;
+            this.render();
+        },
+        hide: function() {
+            this.prop.visible = false;
+            this.render();
+        },
+        render: async function() {
+            if (this.prop.visible) {
+                this.el.style.display = 'block';
+            } else {
+                this.el.style.display = 'none';
+            }
+        },
     });
 
     const iconList$1 = new Template({
-      template: () => {
-        let NPCList = ''; let MonsterList = ''; let CustomList = '';
+        template: () => {
+            let NPCList = ''; let MonsterList = ''; let CustomList = '';
 
-        getPlayerIcons().forEach((i) => {
-          NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-        });
-        getMonsterIcons().forEach((i) => {
-          MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-        });
-        getCustomIcons().forEach((i) => {
-          CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-        });
+            getPlayerIcons().forEach((i) => {
+                NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+            });
+            getMonsterIcons().forEach((i) => {
+                MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+            });
+            getCustomIcons().forEach((i) => {
+                CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+            });
 
-        return `
+            return `
       <div>Your images</div>
-          <span>+</span>  ${CustomList}
+          <span>+</span> 
+          ${CustomList}
       <div>NPCs/Players</div>
           ${NPCList}
       <div>Monsters</div>
           ${MonsterList}
       `;
-      },
-    });
-
-    /**
-     * load filedata from upload
-     *
-     * @param  {[type]} iconImg [description]
-     * @return {[type]}         [description]
-     */
-    async function loadFile(iconImg) {
-      const imgData = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(iconImg);
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror = reject;
-      });
-
-      return checkImage(imgData);
-    }
-
-    /**
-     * resize and return as final icon image to store
-     *
-     * @param  {[type]} iconImg [description]
-     * @return {[type]}         [description]
-     */
-    async function imageToIcon(iconImg) {
-      const img = await loadFile(iconImg);
-
-      // Local storage is small so we wanna scale it down before we save
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-
-      // draw source image into the off-screen canvas:
-      canvas.width = 70;
-      canvas.height = 70;
-      ctx.drawImage(img, 0, 0, 70, 70);
-
-      return canvas.toDataURL('image/webp', 0.8);
-    }
-
-    var ImagePicker = Component$1.define({
-      initialize: function(options) {
-        this.el = controlTpl$1.render();
-        this.el.className = 'image-picker';
-        this.el.style.display = 'none';
-        document.body.appendChild(this.el);
-      },
-      parent: null,
-      prop: {
-        visible: false,
-      },
-      events: {
-        'click img': 'select',
-        'click button': 'close',
-        'click span': 'addIcon',
-
-        'dragover main': 'uploadEnable',
-        'drop main': 'upload',
-        'dragenter main': 'uploadFocus',
-        'dragleave main': 'uploadBlur',
-      },
-      uploadEnable: function(e) {
-        // Need this to be able to upload.
-        e.preventDefault();
-      },
-      open: function(parent) {
-        this.prop.visible = true;
-        this.parent = parent;
-        this.render();
-      },
-      select: function(e, item) {
-        this.parent.src = item.src;
-        this.parent.dataset.id = (item.dataset.id) ? item.dataset.id : item.src;
-
-        this.close();
-      },
-      close: function() {
-        this.parent = null;
-        this.prop.visible = false;
-        this.render();
-      },
-      uploadFocus: function(e) {
-        e.preventDefault();
-        this.el.classList.add('uploadHover');
-      },
-      uploadBlur: function(e) {
-        e.preventDefault();
-        this.el.classList.remove('uploadHover');
-      },
-      upload: async function(e) {
-        e.preventDefault();
-
-        const files = e.dataTransfer.files;
-
-        // Get files that were dragged
-        for (let f = 0; f < files.length; f++) {
-          const file = files[f];
-          // Only deal with images
-          if (!file.type.match('image.*')) continue;
-
-          const newIcon = await imageToIcon(file);
-          localData.saveIcon(newIcon);
-        }
-        this.render();
-        this.uploadBlur(e);
-      },
-      addIcon: async function() {
-        const iconPath = prompt('Icon image url');
-        if (iconPath) {
-          try {
-            await checkImage(iconPath);
-            localData.saveIcon(iconPath);
-            this.render();
-          } catch (e) {
-            alert('failed to load image');
-          }
-        }
-      },
-      render: async function() {
-        this.el.querySelector('main').innerHTML = iconList$1.render().innerHTML;
-
-        if (this.prop.visible) {
-          this.el.style.display = 'block';
-        } else {
-          this.el.style.display = 'none';
-        }
-      },
-    });
-
-    const controlTpl$2 = new Template({
-      template: () => {
-        const defaultIcon = getRandomMonsterIcon();
-        return `
-      <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
-      <div>
-          <label>Name</label>
-          <input type="text" value="Unknown">
-          <input type='submit' value="Spawn">
-      </div>
-    `;
-      },
-    });
-
-    var SpawnControls = Component$1.define({
-      initialize: function(options) {
-        this.el = controlTpl$2.render();
-        this.el.className = 'spawn-controls';
-        this.el.style.display = 'none';
-        document.body.appendChild(this.el);
-
-        this.picker = null;
-      },
-      prop: {
-        visible: false,
-      },
-      events: {
-        'click img': 'openPickList',
-        'click input[type=submit]': 'spawn',
-      },
-      openPickList: function(e, target) {
-        if (!this.picker) this.picker = ImagePicker.make();
-        this.picker.open(target);
-      },
-      spawn: function(e, target) {
-        // default
-        this.trigger('map:spawn', {name: this.el.querySelector('input[type=text]').value, icon: this.el.querySelector('img').dataset.id});
-      },
-      toggle: function() {
-        this.prop.visible = !this.prop.visible;
-        this.render();
-      },
-      show: function() {
-        this.prop.visible = true;
-        this.render();
-      },
-      hide: function() {
-        this.prop.visible = false;
-        this.render();
-      },
-      render: async function() {
-        if (this.prop.visible) {
-          this.el.style.display = 'block';
-        } else {
-          this.el.style.display = 'none';
-        }
-      },
-    });
-
-    var Controls = Component$1.define({
-      initialize: function(config) {
-        this.el = document.querySelector(config.options.controlBar);
-        this.fogControls = FogControls.make({fogProps: config.options.fog});
-        this.spawnControls = SpawnControls.make();
-        this.render();
-
-        // Pass it up
-        this.spawnControls.on('map:spawn', (v) => {
-          this.trigger('map:spawn', v);
-        });
-      },
-      events: {
-        'click span.fog': 'fogToggle',
-        'click span.spawn': 'spawnToggle',
-      },
-      fogToggle: function(e, target) {
-        this.fogControls.toggle();
-      },
-      spawnToggle: function(e, target) {
-        this.spawnControls.toggle();
-      },
-      render: async function() {
-
-      },
-    });
-
-    const base = {
-      'container': '#map',
-      'playerBar': '#player-bar',
-      'controlBar': '#control-bar',
-      'map': null,
-      'players': [],
-      'spawns': [],
-      'fog': {
-        enabled: true,
-        opacity: 70,
-        clearSize: 36,
-        mask: '',
-      },
-      'icon': {
-        'tilesize': '60',
-        'mode': 'default',
-      },
-      'data:version': 2,
-    };
-
-    function applySettings(base, overrides) {
-      for (const [key, value] of Object.entries(overrides)) {
-        if (typeof value === 'object' && value !== null) {
-          base[key] = applySettings(base[key] ?? {}, value);
-        } else {
-          base[key] = value;
-        }
-      }
-      return base;
-    }
-
-    function applyDefaults(options) {
-      return applySettings(base, options);
-    }
-
-    var Encounter = Component$1.define({
-      initialize: function(config) {
-        // Take control of root
-        this.el = document.querySelector('body');
-        this.el.classList = 'app';
-
-        // Apply defaults and sanity check
-        let options = applyDefaults(config.options);
-
-        if (options.assetPath) {
-          setIconPath(options.assetPath);
-        }
-
-        // Get config or load from local storage
-        if (localData.hasMap(options.map) && config.save !== 'false') {
-          options = localData.loadMap(options.map);
-        }
-
-        // Set global state
-        const props = new Model(options);
-
-        const map = EncounterMap.make({options: props.data, bus: props});
-        const players = Players.make({options: props.data, bus: props});
-        const controls = Controls.make({options: props.data, bus: props});
-
-        // Pass model eventing
-        map.listenTo(props);
-
-        players.on('map:player:spawn', function(player) {
-          map.trigger('map:player:spawn', player);
-        });
-        players.on('map:player:focus', function(player) {
-          map.trigger('map:player:focus', player);
-        });
-
-        controls.on('map:spawn', function(v) {
-          const spawn = {
-            ...v,
-            id: props.data.spawns.length,
-            x: 0,
-            y: 0,
-            spawned: true,
-          };
-          props.data.spawns.push(spawn);
-          map.trigger('map:spawn', props.data.spawns[props.data.spawns.length - 1]);
-        });
-
-        // Save local storage
-        props.on('updated', () => {
-          localData.saveMap(config.options.map, props.data);
-        });
-      },
-    });
-
-    const controlTpl$3 = new Template({
-      template: () => {
-        return `
-      <main></main>
-      <footer><button>Cancel</button></footer>
-    `;
-      },
-    });
-
-    const iconList$2 = new Template({
-      template: () => {
-        let NPCList = ''; let MonsterList = ''; let CustomList = '';
-
-        getPlayerIcons().forEach((i) => {
-          NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-        });
-        getMonsterIcons().forEach((i) => {
-          MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-        });
-        getCustomIcons().forEach((i) => {
-          CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-        });
-
-        return `
-      <div>Your images</div>
-          <span>+</span>  ${CustomList}
-      <div>NPCs/Players</div>
-          ${NPCList}
-      <div>Monsters</div>
-          ${MonsterList}
-      `;
-      },
+        },
     });
 
     /**
@@ -18128,14 +18811,14 @@
      * @return {[type]}         [description]
      */
     async function loadFile$1(iconImg) {
-      const imgData = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(iconImg);
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror = reject;
-      });
+        const imgData = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(iconImg);
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+        });
 
-      return checkImage(imgData);
+        return checkImage(imgData);
     }
 
     /**
@@ -18145,315 +18828,741 @@
      * @return {[type]}         [description]
      */
     async function imageToIcon$1(iconImg) {
-      const img = await loadFile$1(iconImg);
+        const img = await loadFile$1(iconImg);
 
-      // Local storage is small so we wanna scale it down before we save
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+        // Local storage is small so we wanna scale it down before we save
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
 
-      // draw source image into the off-screen canvas:
-      canvas.width = 70;
-      canvas.height = 70;
-      ctx.drawImage(img, 0, 0, 70, 70);
+        // draw source image into the off-screen canvas:
+        canvas.width = 70;
+        canvas.height = 70;
+        ctx.drawImage(img, 0, 0, 70, 70);
 
-      return canvas.toDataURL('image/webp', 0.8);
+        return canvas.toDataURL('image/webp', 0.8);
     }
 
     var ImagePicker$1 = Component$1.define({
-      initialize: function(options) {
-        this.el = controlTpl$3.render();
-        this.el.className = 'image-picker';
-        this.el.style.display = 'none';
-        document.body.appendChild(this.el);
-      },
-      parent: null,
-      prop: {
-        visible: false,
-      },
-      events: {
-        'click img': 'select',
-        'click button': 'close',
-        'click span': 'addIcon',
+        initialize: function(options) {
+            this.el = this.tpl();
+            this.parent = options.target;
 
-        'dragover main': 'uploadEnable',
-        'drop main': 'upload',
-        'dragenter main': 'uploadFocus',
-        'dragleave main': 'uploadBlur',
-      },
-      uploadEnable: function(e) {
-        // Need this to be able to upload.
-        e.preventDefault();
-      },
-      open: function(parent) {
-        this.prop.visible = true;
-        this.parent = parent;
-        this.render();
-      },
-      select: function(e, item) {
-        this.parent.src = item.src;
-        this.parent.dataset.id = (item.dataset.id) ? item.dataset.id : item.src;
-
-        this.close();
-      },
-      close: function() {
-        this.parent = null;
-        this.prop.visible = false;
-        this.render();
-      },
-      uploadFocus: function(e) {
-        e.preventDefault();
-        this.el.classList.add('uploadHover');
-      },
-      uploadBlur: function(e) {
-        e.preventDefault();
-        this.el.classList.remove('uploadHover');
-      },
-      upload: async function(e) {
-        e.preventDefault();
-
-        const files = e.dataTransfer.files;
-
-        // Get files that were dragged
-        for (let f = 0; f < files.length; f++) {
-          const file = files[f];
-          // Only deal with images
-          if (!file.type.match('image.*')) continue;
-
-          const newIcon = await imageToIcon$1(file);
-          localData.saveIcon(newIcon);
-        }
-        this.render();
-        this.uploadBlur(e);
-      },
-      addIcon: async function() {
-        const iconPath = prompt('Icon image url');
-        if (iconPath) {
-          try {
-            await checkImage(iconPath);
-            localData.saveIcon(iconPath);
             this.render();
-          } catch (e) {
-            alert('failed to load image');
-          }
-        }
-      },
-      render: async function() {
-        this.el.querySelector('main').innerHTML = iconList$2.render().innerHTML;
+            // Add to world
+            document.body.appendChild(this.el);
+        },
+        className: 'modal',
+        template: () => {
+            return `
+            <div class='image-picker'>
+                <h2>Image picker</h2>
+                 <main></main>
+                <footer><button>Cancel</button></footer>
+            </div>
+        `;
+        },
+        events: {
+            'click img': 'select',
+            'click span': 'addIcon',
+            // Close options
+            'click button': 'close',
+            'click .modal': 'close',
+            // Upload options
+            'dragover main': 'uploadEnable',
+            'drop main': 'upload',
+            'dragenter main': 'uploadFocus',
+            'dragleave main': 'uploadBlur',
+        },
+        uploadEnable: function(e) {
+            // Need this to be able to upload.
+            e.preventDefault();
+        },
+        select: function(e, item) {
+            this.parent.src = item.src;
+            this.parent.dataset.id = (item.dataset.id) ? item.dataset.id : item.src;
 
-        if (this.prop.visible) {
-          this.el.style.display = 'block';
-        } else {
-          this.el.style.display = 'none';
-        }
-      },
+            this.close();
+        },
+        close: function() {
+            this.destroy();
+        },
+        uploadFocus: function(e) {
+            e.preventDefault();
+            this.el.querySelector('.image-picker').classList.add('uploadHover');
+        },
+        uploadBlur: function(e) {
+            e.preventDefault();
+            this.el.querySelector('.image-picker').classList.remove('uploadHover');
+        },
+        upload: async function(e) {
+            e.preventDefault();
+
+            const files = e.dataTransfer.files;
+
+            // Get files that were dragged
+            for (let f = 0; f < files.length; f++) {
+                const file = files[f];
+                // Only deal with images
+                if (!file.type.match('image.*')) continue;
+
+                const newIcon = await imageToIcon$1(file);
+                localData.saveIcon(newIcon);
+            }
+            this.render();
+            this.uploadBlur(e);
+        },
+        addIcon: async function() {
+            const iconPath = prompt('Icon image url');
+            if (iconPath) {
+                try {
+                    await checkImage(iconPath);
+                    localData.saveIcon(iconPath);
+                    this.render();
+                } catch (e) {
+                    alert('failed to load image');
+                }
+            }
+        },
+        render: async function() {
+            this.el.querySelector('main').innerHTML = iconList$1.render().innerHTML;
+        },
     });
 
-    const wizardPlayersTpl = new Template({
-      template: () => {
-        return `
+    var SpawnControls = Component$1.define({
+        spawns: null,
+        initialize: function(options) {
+            // Render base template
+            this.el = this.tpl();
+            this.el.style.display = 'none';
+            // Store spawn accessor
+            this.spawns = options.spawns;
+
+            // Create self on the global level as needed.
+            document.body.appendChild(this.el);
+        },
+        className: 'spawn-controls',
+        template: () => {
+            const defaultIcon = getRandomMonsterIcon();
+            return `
+            <h2>Spawn new mob</h2>
+            <img src="${getIconImage(defaultIcon)}" data-id="${defaultIcon}">
+            <div>
+                <label>Name</label>
+                <input type="text" value="">
+                <input type='submit' value="Spawn">
+            </div>
+        `;
+        },
+        data: {
+            visible: false,
+        },
+        events: {
+            'click img': 'openPickList',
+            'click input[type=submit]': 'save',
+            'keyup input[type=text]': 'detectSubmit',
+        },
+        // Save via keyboard
+        detectSubmit: function(e) {
+            if (e.key == 'Enter' || e.keyCode == 13) {
+                this.save();
+            }
+        },
+        openPickList: function(e, target) {
+            ImagePicker$1.make({target});
+        },
+        save: function(e, target) {
+            this.spawns.push({
+                name: this.el.querySelector('input[type=text]').value,
+                icon: this.el.querySelector('img').dataset.id,
+                id: this.spawnslength,
+                spawned: true,
+            });
+            this.focus();
+        },
+        toggle: function() {
+            this.data.visible = !this.data.visible;
+        },
+        render: function() {
+            this.el.style.display = (this.data.visible) ? 'block' : 'none';
+            this.focus();
+        },
+        focus: function() {
+            if (this.data.visible) this.el.querySelector('input[type=text]').focus();
+        },
+    });
+
+    var Controls = Component$1.define({
+        initialize: function(config) {
+        // SetID
+            this.el.id = 'control-bar';
+
+            // Render controls
+            this.el.appendChild(this.tpl());
+
+            this.fogControls = FogControls.make({fogProps: config.state.get('fog')});
+            this.spawnControls = SpawnControls.make({spawns: config.state.get('spawns')});
+            this.render();
+        },
+        template: () => {
+            return `
+            <a href="https://github.com/thybag/rpg-quick-encounter" target="_blank">Help</a>
+            <span class='fog'>Fog</span>
+            <span class="spawn">Spawn</span>
+        `;
+        },
+        events: {
+            'click span.fog': 'fogToggle',
+            'click span.spawn': 'spawnToggle',
+        },
+        fogToggle: function(e, target) {
+            this.fogControls.toggle();
+        },
+        spawnToggle: function(e, target) {
+            this.spawnControls.toggle();
+        },
+        render: async function() {
+
+        },
+    });
+
+    /**
+     * Migrate map data to latest structures
+     *
+     * @param  {[type]} data [description]
+     * @return {[type]}      [description]
+     */
+    function migrateMapData(data) {
+        // Initial migration to data version 3.
+        // No major changes to structure have yet been made, so this is
+        // mostly just stripping out legacy data points.
+        if (!data['data:version'] || data['data:version'] < 3) {
+            data = {
+                'map': data.map,
+                'players': data.players,
+                'spawns': data.spawns,
+                'fog': data.fog,
+                'icon': data.icon,
+                'data:version': 3,
+            };
+        }
+
+        // v4 yet to come...
+
+        return data;
+    }
+
+    const setAppState = function(newState) {
+    };
+
+    const base = {
+        // App config
+        config: {
+            'assetPath': 'assets/',
+            'dataPrefix': '',
+        },
+        // Encounter data
+        data: {
+            'map': null,
+            'players': [],
+            'spawns': [],
+            'fog': {
+                enabled: true,
+                opacity: 70,
+                clearSize: 36,
+                mask: '',
+            },
+            'icon': {
+                'tilesize': '60',
+                'mode': 'default',
+            },
+            'data:version': 3,
+        },
+    };
+
+    /**
+     * Override default setting data with provided values
+     *
+     * @param  {[type]} base      [description]
+     * @param  {[type]} overrides [description]
+     * @return {[type]}           [description]
+     */
+    function applySettings(base, overrides) {
+
+        for (const [key, value] of Object.entries(overrides)) {
+            if (typeof value === 'object' && value !== null) {
+                base[key] = applySettings(base[key] ?? {}, value);
+            } else {
+                base[key] = value;
+            }
+        }
+
+        return base;
+    }
+
+    /**
+     * Get settings for app
+     *
+     * @param  {Object} options [description]
+     * @return {[type]}         [description]
+     */
+    function applyDefaults(options = {}) {
+        return applySettings(base, options);
+    }
+
+    var debounce = (callback, time = 250, interval) => {
+        return (...args) => {
+            clearTimeout(interval);
+            interval = setTimeout(() => callback(...args), time);
+        };
+    };
+
+    var Encounter = Component$1.define({
+        initialize: function(config) {
+            // Take control of root
+            this.el.classList = 'app';
+
+            // Apply defaults and sanity check
+            const setup = applyDefaults(config.options);
+            setAppState(setup.config);
+
+            // Configure app
+            localData.setDataPrefix(setup.config.dataPrefix);
+            setIconPath(setup.config.assetPath);
+
+            // Reload saved map state
+            if (localData.hasMap(setup.data.map) && config.save !== 'false') {
+                // migrateMapData will ensure map data version is updated to
+                // the latest format
+                setup.data = migrateMapData(localData.loadMap(setup.data.map));
+            }
+
+            // Setup map as reactive model
+            const mapState = new Model(setup.data);
+
+            // Setup DOM structure for Encounter maps
+            const wrapperEl = document.createElement('div');
+            const mapEl = document.createElement('div');
+            const playerEl = document.createElement('div');
+            const controlEl = document.createElement('div');
+
+            wrapperEl.appendChild(mapEl);
+            wrapperEl.appendChild(playerEl);
+
+            // Add to self
+            this.el.appendChild(wrapperEl);
+            this.el.appendChild(controlEl);
+
+            // Boot Core Components
+            EncounterMap.make({el: mapEl, state: mapState});
+            Players.make({el: playerEl, players: mapState.get('players')});
+            Controls.make({el: controlEl, state: mapState});
+
+            this.initSync(mapState);
+        },
+        initSync: function(mapState) {
+            const map = mapState.get('map');
+            let sync = true;
+
+            // Listen for local storage being changed on this map
+            localData.listen(map, function(updated) {
+                // disable sync while changes are applied.
+                sync = false;
+                // update ourselves to match if so.
+                mapState.set('spawns', updated.spawns);
+                mapState.set('fog', updated.fog);
+                mapState.set('players', updated.players);
+                sync = true;
+            });
+
+            // commit changes to local storage
+            const commitChanges = debounce(() => {
+                // Avoid unneeded saves
+                localData.saveMap(map, mapState.data);
+            }, 50);
+
+            // Commit changes if sync is enabled at time change is applied.
+            mapState.on('updated', () => {
+                if (sync) commitChanges();
+            });
+        },
+    });
+
+    const iconList = new Template({
+        template: () => {
+            let NPCList = ''; let MonsterList = ''; let CustomList = '';
+
+            getPlayerIcons().forEach((i) => {
+                NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+            });
+            getMonsterIcons().forEach((i) => {
+                MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+            });
+            getCustomIcons().forEach((i) => {
+                CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+            });
+
+            return `
+      <div>Your images</div>
+          <span>+</span> 
+          ${CustomList}
+      <div>NPCs/Players</div>
+          ${NPCList}
+      <div>Monsters</div>
+          ${MonsterList}
+      `;
+        },
+    });
+
+    /**
+     * load filedata from upload
+     *
+     * @param  {[type]} iconImg [description]
+     * @return {[type]}         [description]
+     */
+    async function loadFile(iconImg) {
+        const imgData = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(iconImg);
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+        });
+
+        return checkImage(imgData);
+    }
+
+    /**
+     * resize and return as final icon image to store
+     *
+     * @param  {[type]} iconImg [description]
+     * @return {[type]}         [description]
+     */
+    async function imageToIcon(iconImg) {
+        const img = await loadFile(iconImg);
+
+        // Local storage is small so we wanna scale it down before we save
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // draw source image into the off-screen canvas:
+        canvas.width = 70;
+        canvas.height = 70;
+        ctx.drawImage(img, 0, 0, 70, 70);
+
+        return canvas.toDataURL('image/webp', 0.8);
+    }
+
+    var ImagePicker = Component$1.define({
+        initialize: function(options) {
+            this.el = this.tpl();
+            this.parent = options.target;
+
+            this.render();
+            // Add to world
+            document.body.appendChild(this.el);
+        },
+        className: 'modal',
+        template: () => {
+            return `
+            <div class='image-picker'>
+                <h2>Image picker</h2>
+                 <main></main>
+                <footer><button>Cancel</button></footer>
+            </div>
+        `;
+        },
+        events: {
+            'click img': 'select',
+            'click span': 'addIcon',
+            // Close options
+            'click button': 'close',
+            'click .modal': 'close',
+            // Upload options
+            'dragover main': 'uploadEnable',
+            'drop main': 'upload',
+            'dragenter main': 'uploadFocus',
+            'dragleave main': 'uploadBlur',
+        },
+        uploadEnable: function(e) {
+            // Need this to be able to upload.
+            e.preventDefault();
+        },
+        select: function(e, item) {
+            this.parent.src = item.src;
+            this.parent.dataset.id = (item.dataset.id) ? item.dataset.id : item.src;
+
+            this.close();
+        },
+        close: function() {
+            this.destroy();
+        },
+        uploadFocus: function(e) {
+            e.preventDefault();
+            this.el.querySelector('.image-picker').classList.add('uploadHover');
+        },
+        uploadBlur: function(e) {
+            e.preventDefault();
+            this.el.querySelector('.image-picker').classList.remove('uploadHover');
+        },
+        upload: async function(e) {
+            e.preventDefault();
+
+            const files = e.dataTransfer.files;
+
+            // Get files that were dragged
+            for (let f = 0; f < files.length; f++) {
+                const file = files[f];
+                // Only deal with images
+                if (!file.type.match('image.*')) continue;
+
+                const newIcon = await imageToIcon(file);
+                localData.saveIcon(newIcon);
+            }
+            this.render();
+            this.uploadBlur(e);
+        },
+        addIcon: async function() {
+            const iconPath = prompt('Icon image url');
+            if (iconPath) {
+                try {
+                    await checkImage(iconPath);
+                    localData.saveIcon(iconPath);
+                    this.render();
+                } catch (e) {
+                    alert('failed to load image');
+                }
+            }
+        },
+        render: async function() {
+            this.el.querySelector('main').innerHTML = iconList.render().innerHTML;
+        },
+    });
+
+    const playerTpl = new Template({
+        template: (name, icon) => {
+            return `
+        <span class="icon"><img src="${getIconImage(icon)}" data-id="${icon}" title="Click to change icon."></span>
+        <input type='text' name="name" value="${name}" placeholder="Player name">
+        <span class="remove" title="Remove player">X</span>
+    `;
+        },
+        className: 'player-option',
+    });
+
+    const defaultPlayers$1 = [
+        {name: 'Caster'},
+        {name: 'Tank'},
+        {name: 'Rogue'},
+        {name: 'Healer'},
+        {name: 'Fighter'},
+    ];
+
+    var AddPlayers = Component$1.define({
+        playerTarget: null,
+        initialize: function(config) {
+            this.el = this.tpl();
+
+            const icons = getRandomPlayerIconList();
+            this.playerTarget = this.el.querySelector('div');
+
+            const players = localData.getPlayers() || defaultPlayers$1;
+
+            players.forEach((p, idx) => {
+                this.createPlayerRow({name: p.name, icon: p.icon || icons[idx]});
+            });
+        },
+        template: () => {
+            return `
         <h2>Players</h2>
         <div></div>
         <button>Add another player</button>
     `;
-      },
+        },
+        events: {
+            'click img': 'openPickList',
+            'click button': 'addPlayer',
+            'click .remove': 'removePlayer',
+        },
+        addPlayer: function() {
+            this.createPlayerRow({});
+        },
+        removePlayer: function(e, target) {
+            target.parentNode.remove();
+        },
+        createPlayerRow: function({name = '', icon = null}) {
+            if (!icon) icon = getRandomPlayerIcon();
+
+            const nPlayer = playerTpl.render(name, icon);
+            this.playerTarget.appendChild(nPlayer);
+        },
+        openPickList: function(e, target) {
+            ImagePicker.make({target});
+        },
+        toUrlString: function() {
+            const parts = [];
+            const players = [];
+
+            for (const node of this.playerTarget.children) {
+                const player = {name: node.querySelector('input').value, icon: node.querySelector('img').dataset.id};
+
+                players.push(player);
+                parts.push(`${player.name}|${player.icon}`);
+            }
+
+            localData.setPlayers(players);
+            return '&players=' + parts.join(',');
+        },
+        render: async function() {
+            this.el.className = 'wizard';
+        },
     });
 
-    const playerTpl$1 = new Template({
-      template: (name, icon) => {
-        return `
-        <span class="icon"><img src="${getIconImage(icon)}" data-id="${icon}"></span>
-        <input type='text' name="name" value="${name}">
-        <span class="remove">X</span>
-    `;
-      },
-      className: 'player-option',
-    });
-
-
-    const defaultPlayers = [
-      {name: 'Caster'},
-      {name: 'Tank'},
-      {name: 'Rogue'},
-      {name: 'Healer'},
-      {name: 'Fighter'},
-    ];
-
-    var AddPlayers = Component$1.define({
-      playerTarget: null,
-      initialize: function(config) {
-        this.el = wizardPlayersTpl.render();
-        this.picker = null;
-
-        const icons = getRandomPlayerIconList();
-        this.playerTarget = this.el.querySelector('div');
-
-        const players = localData.getPlayers() || defaultPlayers;
-
-        players.forEach((p, idx) => {
-          this.createPlayerRow({name: p.name, icon: p.icon || icons[idx]});
-        });
-      },
-      events: {
-        'click img': 'openPickList',
-        'click button': 'addPlayer',
-        'click .remove': 'removePlayer',
-      },
-      addPlayer: function() {
-        this.createPlayerRow({});
-      },
-      removePlayer: function(e, target) {
-        target.parentNode.remove();
-      },
-      createPlayerRow: function({name = '', icon = null}) {
-        if (!icon) icon = getRandomPlayerIcon();
-
-        const nPlayer = playerTpl$1.render(name, icon);
-        this.playerTarget.appendChild(nPlayer);
-      },
-      openPickList: function(e, target) {
-        if (!this.picker) this.picker = ImagePicker$1.make();
-        this.picker.open(target);
-      },
-      toUrlString: function() {
-        const parts = [];
-        const players = [];
-
-        for (const node of this.playerTarget.children) {
-          const player = {name: node.querySelector('input').value, icon: node.querySelector('img').dataset.id};
-
-          players.push(player);
-          parts.push(`${player.name}|${player.icon}`);
-        }
-
-        localData.setPlayers(players);
-        return '&players=' + parts.join(',');
-      },
-      render: async function() {
-        this.el.className = 'wizard';
-      },
-    });
-
-    const wizardTpl = new Template({
-      template: () => {
-        return `
-      <div class="wizard">
-          <h1>Start your new Encounter!</h1>
-          <main>
-              <p>
-                  <strong>RPG quick encounter</strong> is an online tool to help you get up and running with 
-                  your next encounter in moments.
-              </p>
-              <hr>
-
-              <label>Paste the link to the map you'd like to use</label>
-              <input type='url' name="map" placeholder="https://..." required>
-              
-              <span class='more'>More options</span>
-              <div class="advanced">
-                 
-              </div>
-          </main>
-          <footer>
-              <button class="submit">Start your encounter</button>
-          </footer>
-      </div>
-    `;
-      },
-    });
-
-    const savesTlp = new Template({
-      'template': (saves) => {
-        return `
+    const savesTlp = new Template$2({
+        'template': (saves) => {
+            return `
       <h2>Your existing saves</h2>
       <main>
-          ${saves.map((s) => {
-    const map = s.substr(4);// Remove prefix
-    return `<a href="?map=${map}"><img src="${map}"/></a>`;
-  }).join('')}
+          ${saves.map((map) => {
+        return `<a href="?map=${map.map}">
+                <img src="${map.map}" loading="lazy" />
+                <div>
+                    Map: <span>${map.map}</span> <br/>
+                    Players: ${map?.players?.length}, Mobs: ${map?.spawns?.length} <br/>
+                    Last played: ${map['data:updated'] ? new Date(map['data:updated']).toLocaleString() :'-'}
+                </div>
+                <div class='play'>
+                    <button>Open</button>
+                </div>
+            </a>`;
+    }).join('')}
       </main>
     `;
-      },
-      'safe': false,
+        },
+        'safe': false,
     });
 
     var Wizard = Component$1.define({
-      initialize: function(config) {
-        this.el = wizardTpl.render();
-        document.body.appendChild(this.el);
-        this.render();
-      },
-      playersComponent: null,
-      events: {
-        'click .submit': 'startEncounter',
-        'keyup input[name=map]': 'detectSubmit',
-        'click .more': 'showMore',
-      },
-      showMore: function() {
-        if (!this.playersComponent) {
-          this.playersComponent = AddPlayers.make();
-          this.el.querySelector('.advanced').appendChild(this.playersComponent.el);
-        }
-        this.el.querySelector('.advanced').classList.toggle('show');
-      },
-      detectSubmit: function(e) {
-        if (e.key == 'Enter' || e.keyCode == 13) {
-          this.startEncounter();
-        }
-      },
-      startEncounter: async function() {
-        const mapInput = this.el.querySelector('input[name=map]');
+        initialize: function(config) {
+        // Setup default envs
+            const setup = applyDefaults();
+            localData.setDataPrefix(setup.config.dataPrefix);
 
-        // Check its a url
-        if (!mapInput.checkValidity()) {
-          mapInput.reportValidity();
-          return;
-        }
+            this.el = this.tpl();
+            document.body.appendChild(this.el);
+            this.render();
+        },
+        template: () => {
+            return `
+          <div class="wizard">
+              <h1>Start your new Encounter!</h1>
+              <main>
+                  <p>
+                      <strong>RPG quick encounter</strong> is an online tool to help you get up and running with 
+                      your next encounter in moments.
+                  </p>
+                  <hr>
 
-        // Check its a valid image
-        try {
-          await checkImage(mapInput.value);
-        } catch (e) {
-          mapInput.setCustomValidity('URL is not an image or cannot be reached.');
-          mapInput.reportValidity();
-          return;
-        }
+                  <label>Paste the link to the map you'd like to use</label>
+                  <input type='url' name="map" placeholder="https://..." required>
+                  
+                  <span class='more'>More options</span>
+                  <div class="advanced">
+                     
+                  </div>
+              </main>
+              <footer>
+                  <button class="submit">Start your encounter</button>
+              </footer>
+          </div>
+        `;
+        },
+        playersComponent: null,
+        events: {
+            'click .submit': 'startEncounter',
+            'keyup input[name=map]': 'detectSubmit',
+            'click .more': 'showMore',
+        },
+        showMore: function() {
+            if (!this.playersComponent) {
+                this.playersComponent = AddPlayers.make();
+                this.el.querySelector('.advanced').appendChild(this.playersComponent.el);
+            }
+            this.el.querySelector('.advanced').classList.toggle('show');
+        },
+        detectSubmit: function(e) {
+            if (e.key == 'Enter' || e.keyCode == 13) {
+                this.startEncounter();
+            }
+            // Clear custom validation on change
+            e.target.setCustomValidity('');
+        },
+        startEncounter: async function() {
+            const mapInput = this.el.querySelector('input[name=map]');
+            const mapPath = mapInput.value;
 
-        let path = window.location.pathname + '?map=' + mapInput.value;
+            // Check its a url
+            if (!mapInput.checkValidity()) {
+                mapInput.reportValidity();
+                return;
+            }
 
-        if (this.playersComponent && this.el.querySelector('.advanced').classList.contains('show')) {
-          path += this.playersComponent.toUrlString();
-        }
+            // Check its a valid image
+            try {
+                await checkImage(mapPath);
+            } catch (e) {
+                mapInput.setCustomValidity('URL is not an image or cannot be reached.');
+                mapInput.reportValidity();
+                return;
+            }
 
-        // Send em to the app!
-        window.location = path;
-      },
-      render: function() {
-        this.el.className = 'wizard-container';
+            // Check if we have a save for this map?
+            if (localData.hasMap(mapPath)) {
+                return WarningModal.make({
+                    notice: "Existing encounter detected.",
+                    explanation: "You have an active encounter running on this map already. Your previous settings will be used.",
+                    callback: () => { this.sendToEncounter(mapPath); }
+                });
+            }
 
-        // Do you have any saved maps?
-        const saves = localData.getMaps();
-        if (saves.length !== 0) {
-          const saveZone = savesTlp.render(saves);
-          saveZone.className = 'save-zone';
-          this.el.appendChild(saveZone);
-        }
-      },
+            this.sendToEncounter(mapPath);
+        },
+        sendToEncounter: function(mapPath){
+            let path = window.location.pathname + '?map=' + mapPath;
+
+            if (this.playersComponent && this.el.querySelector('.advanced').classList.contains('show')) {
+                path += this.playersComponent.toUrlString();
+            }
+
+            // Send em to the app!
+            window.location = path;
+        },
+        render: function() {
+            this.el.className = 'wizard-container';
+
+            // Do you have any saved maps?
+            const saves = localData.getMaps();
+
+            if (saves.length !== 0) {
+                const saveZone = savesTlp.render(saves);
+                saveZone.className = 'save-zone';
+                this.el.appendChild(saveZone);
+            }
+        },
     });
 
     // Define player defaults
-    const defaultPlayers$1 = [
-      {id: 1, name: 'Fighter', icon: null},
-      {id: 2, name: 'Tank', icon: null},
-      {id: 3, name: 'Caster', icon: null},
-      {id: 4, name: 'Healer', icon: null},
-      {id: 5, name: 'Rogue', icon: null},
+    const defaultPlayers = [
+        {id: 1, name: 'Fighter', icon: null},
+        {id: 2, name: 'Tank', icon: null},
+        {id: 3, name: 'Caster', icon: null},
+        {id: 4, name: 'Healer', icon: null},
+        {id: 5, name: 'Rogue', icon: null},
     ];
 
     // If we are using this direct we take everything from URL.
     const url = new URLSearchParams(window.location.search);
     const map = url.get('map');
     const players = parsePlayerUrl(url.get('players'));
-    const fog$1 = url.get('fog');
+    const fog = url.get('fog');
 
     // Disable reload from local storage
     const saving = url.has('saving') ? url.get('saving') : 'true';
@@ -18461,18 +19570,20 @@
 
     // Do we have enought?
     if (!map) {
-      component = Wizard.make();
+        component = Wizard.make();
     } else {
-      // Basic setup for standalone
-      const options = {
-        'map': map,
-        // Setup default images if none provided
-        'players': configurePlayers(players),
-        'fog': {
-          enabled: !(fog$1 && fog$1 == 'false'),
-        },
-      };
-      component = Encounter.make({options, save: saving});
+        // Basic setup for standalone
+        const options = {
+            data: {
+                'map': map,
+                // Setup default images if none provided
+                'players': configurePlayers(players),
+                'fog': {
+                    enabled: !(fog && fog == 'false'),
+                },
+            },
+        };
+        component = Encounter.make({el: document.querySelector('body'), options, save: saving});
     }
 
     var component$1 = component;
@@ -18488,18 +19599,18 @@
      * @return {object}
      */
     function parsePlayerUrl(urlString) {
-      // Default players
-      if (!urlString) return localData.getPlayers() || defaultPlayers$1;
+        // Default players
+        if (!urlString) return localData.getPlayers() || defaultPlayers;
 
-      // Url provided
-      return urlString.split(',').map((p) => {
+        // Url provided
+        return urlString.split(',').map((p) => {
         // Any custom icons?
-        if (p.includes('|')) {
-          const parts = p.split('|');
-          return {name: parts[0], icon: parts[1]};
-        }
-        return {name: p};
-      });
+            if (p.includes('|')) {
+                const parts = p.split('|');
+                return {name: parts[0], icon: parts[1]};
+            }
+            return {name: p};
+        });
     }
 
     /**
@@ -18510,16 +19621,16 @@
      * @return {object}
      */
     function configurePlayers(players) {
-      const iconList = getRandomPlayerIconList();
-      // Add icons to anyone missing one
-      players = players.map((p, index) => {
-        if (!p.icon) {
-          p.icon = iconList[index];
-        }
-        return {id: index, name: p.name, icon: p.icon, spawned: false, x: 0, y: 0};
-      });
+        const iconList = getRandomPlayerIconList();
+        // Add icons to anyone missing one
+        players = players.map((p, index) => {
+            if (!p.icon) {
+                p.icon = iconList[index];
+            }
+            return {id: index, name: p.name, icon: p.icon, spawned: false};
+        });
 
-      return players;
+        return players;
     }
 
     return component$1;

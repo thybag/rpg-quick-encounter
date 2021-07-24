@@ -1,0 +1,35 @@
+#map {
+	width:100vw;
+	height: calc(100vh - 40px);
+
+    /* Map styles */
+    .character-icon {
+
+        img {
+            width:100%;
+            padding:0.2rem;
+            margin-bottom: -6px;
+            box-sizing: border-box;
+            border-radius: 2rem;
+        }
+        span {
+          display: block;
+          padding: .1rem 0;
+          background: #fff;
+          border: solid 2px;
+          text-align:center;
+        }
+        span:empty {
+            display:none;
+        }
+    }
+
+    /* Drag behaviors */
+    .leaflet-marker-draggable {
+       transition: transform 0.25s cubic-bezier(0, 0, 0.25, 1);
+    }
+}
+
+.leaflet-dragging #map .leaflet-marker-draggable {
+    transition: none;
+}

@@ -1,69 +1,79 @@
 import Component from 'lumpjs/src/component.js';
 
-const controlTpl = function(fogProps) {
-  const tpl = `
-        <label>
-            <span>Fog opacity</span>
-            <input type="range" min="1" max="100" value="${fogProps.opacity}" name='opacity'>
-        </label>
-        <label>
-            <span>Fog clear size</span>
-            <input type="range" min="1" max="100" value="${fogProps.clearSize}" name='clearSize'>
-        </label>
-        <label class="enable">
-            <span>Fog enabled</span>
-            <span class="toggle">
-                <input type="checkbox" name='enabled' checked>
-                <span></span>
-          </span>
-        </label>
-    `;
-  const template = document.createElement('div');
-  template.innerHTML = tpl;
-  return template;
-};
-
+/**
+ * Fog Control Component.
+ * Allows user to control clear sizing, fog opacity and other related settings.
+ *
+ */
 export default Component.define({
-  initialize: function(options) {
-    this.el = controlTpl(this.fogProps);
-    this.el.className = 'fog-controls';
-    this.el.style.display = 'none';
-    document.body.appendChild(this.el);
-  },
-  prop: {
-    visible: false,
-  },
-  events: {
-    'click input[name=enabled]': 'toggleFog',
-    'change input[name=opacity]': 'changeOpacity',
-    'change input[name=clearSize]': 'changeClearSize',
-  },
-  toggleFog: function(e, target) {
-    this.fogProps.enabled = target.checked;
-  },
-  changeOpacity: function(e, target) {
-    this.fogProps.opacity = target.value;
-  },
-  changeClearSize: function(e, target) {
-    this.fogProps.clearSize = target.value;
-  },
-  toggle: function() {
-    this.prop.visible = !this.prop.visible;
-    this.render();
-  },
-  show: function() {
-    this.prop.visible = true;
-    this.render();
-  },
-  hide: function() {
-    this.prop.visible = false;
-    this.render();
-  },
-  render: async function() {
-    if (this.prop.visible) {
-      this.el.style.display = 'flex';
-    } else {
-      this.el.style.display = 'none';
-    }
-  },
+    initialize: function(options) {
+        // Config template
+        this.el = this.tpl(this.fogProps.opacity, this.fogProps.clearSize);
+        this.el.style.display = 'none';
+
+        // Create self on parent
+        document.body.appendChild(this.el);
+    },
+    // Events
+    events: {
+        'click input[name=enabled]': 'toggleFog',
+        'change input[name=opacity]': 'changeOpacity',
+        'change input[name=clearSize]': 'changeClearSize',
+    },
+    // Template
+    className: 'fog-controls',
+    template: (opacity, clearSize) => {
+        return `
+            <h2>Fog settings</h2>
+            <div>
+            <label>
+                <span>Fog opacity</span>
+                <input type="range" min="1" max="100" value="${opacity}" name='opacity'>
+            </label>
+            <label>
+                <span>Fog clear size</span>
+                <input type="range" min="1" max="100" value="${clearSize}" name='clearSize'>
+            </label>
+            <label class="enable">
+                <span>Fog enabled</span>
+                <span class="toggle">
+                    <input type="checkbox" name='enabled' checked>
+                    <span></span>
+              </span>
+            </label>
+            </div>
+        `;
+    },
+    prop: {
+        visible: false,
+    },
+    // Actions
+    toggleFog: function(e, target) {
+        this.fogProps.enabled = target.checked;
+    },
+    changeOpacity: function(e, target) {
+        this.fogProps.opacity = target.value;
+    },
+    changeClearSize: function(e, target) {
+        this.fogProps.clearSize = target.value;
+    },
+    toggle: function() {
+        this.prop.visible = !this.prop.visible;
+        this.render();
+    },
+    show: function() {
+        this.prop.visible = true;
+        this.render();
+    },
+    hide: function() {
+        this.prop.visible = false;
+        this.render();
+    },
+    render: async function() {
+        if (this.prop.visible) {
+            this.el.style.display = 'block';
+        } else {
+            this.el.style.display = 'none';
+        }
+    },
 });
