@@ -1,17 +1,18 @@
 {
  "name": "rpg-encounter",
- "version": "0.0.1",
+ "version": "1.0.0",
  "private": true,
  "license": "MIT",
  "dependencies": {
   "@turf/turf": "^6.2.0",
   "leaflet": "^1.7.1",
-  "lumpjs": "git+ssh://git@github.com/thybag/lump.js.git"
+  "lumpjs": "^0.3.2"
  },
  "scripts": {
-  "build": "rollup -c",
+  "start": "yarn watch",
   "watch": "rollup -c --watch",
-  "lint": "eslint src --fix"
+  "build": "rollup -c",
+  "lint": "eslint src"
  },
  "devDependencies": {
   "@rollup/plugin-commonjs": "^17.1.0",
@@ -23,6 +24,7 @@
   "eslint-plugin-node": "^11.1.0",
   "eslint-plugin-promise": "^4.3.1",
   "rollup": "^2.39.0",
-  "rollup-plugin-import-css": "^2.0.0"
+  "rollup-plugin-scss": "3",
+  "sass": "^1.35.1"
  }
 }

@@ -1,57 +1,121 @@
 let allocated = 0;
 
+/**
+ * UID
+ * @return {string} Unique ID for this instance
+ */
 function uid() {
-  return (new Date().getTime()) + '_' + (allocated++);
+    return (new Date().getTime()) + '_' + (allocated++);
 }
 
 export default new function() {
-  const storage = window.localStorage;
-  const mapPrefix = 'map:';
+    const storage = window.localStorage;
+    const mapPrefix = 'map:';
+    let dataPrefix = '';
 
-  this.hasMap = function(key) {
-    return (storage.getItem(mapPrefix + key));
-  };
+    this.setDataPrefix = function(newPrefix) {
+        dataPrefix = newPrefix;
+    };
+    // Get helper to reteave a value from store
+    this._get = function(key) {
+        return JSON.parse(storage.getItem(dataPrefix + key));
+    };
+    // Set helper, to save a value to store
+    this._set = function(key, value) {
+        return storage.setItem(dataPrefix + key, JSON.stringify(value));
+    };
+    // Exists helper to check if value exists in store.
+    this._has = function(key) {
+        return (storage.getItem(dataPrefix + key));
+    };
 
-  this.loadMap = function(key) {
-    return JSON.parse(storage.getItem(mapPrefix + key));
-  };
+    this.hasMap = function(key) {
+        return (this._has(mapPrefix + key));
+    };
 
-  this.saveMap = function(key, data) {
-    return storage.setItem(mapPrefix + key, JSON.stringify(data));
-  };
+    this.loadMap = function(key) {
+        const map = this._get(mapPrefix + key);
+        map['data:updated'] = null;
+        return map;
+    };
 
-  this.getMaps = function() {
-    return Object.keys(storage).filter((x) => {
-      return x.startsWith('map:');
-    });
-  };
+    this.saveMap = function(key, data) {
+        const clean = JSON.parse(JSON.stringify(data));
+        // Inject last updated.
+        clean['data:updated'] = new Date();
 
-  this.getIcons = function() {
-    const icons = JSON.parse(storage.getItem('icons'));
-    return (icons) || {};
-  };
+        return this._set(mapPrefix + key, clean);
+    };
 
-  this.getIcon = function(id) {
-    const icons = this.getIcons();
-    return icons[id];
-  };
+    // Get all map paths in dataPrefix
+    this.getMaps = function() {
+        // Find matching maps
+        const maps = Object.entries(storage).filter(
+            // Include only relevent maps
+            ([key, data]) => {
+                return key.startsWith(dataPrefix + mapPrefix);
+            },
+        ).map(
+            // Parse in to real data
+            ([key, data]) => {
+                return JSON.parse(data);
+            },
+        );
 
-  this.saveIcon = function(iconPath) {
-    const icons = this.getIcons();
-    icons['icon:' + uid()] = iconPath;
-    storage.setItem('icons', JSON.stringify(icons));
-  };
+        // Most recently used first
+        maps.sort(function(b, a) {
+            // Legacy issue for now is a lot of older maps won't have the updated date.
+            // For these assume it was 2020.
+            const d1 = (a['data:updated']) ? new Date(a['data:updated']) : new Date('2020-01-01');
+            const d2 = (b['data:updated']) ? new Date(b['data:updated']) : new Date('2020-01-01');
+            return d1-d2;
+        });
 
-  this.removeIcon = function() {
+        return maps;
+    };
 
-  };
+    // Get all icons
+    this.getIcons = function() {
+        const icons = this._get('icons');
+        return (icons) || {};
+    };
 
-  this.setPlayers = function(players) {
-    storage.setItem('players', JSON.stringify(players));
-  };
+    // get a single icon
+    this.getIcon = function(id) {
+        const icons = this.getIcons();
+        return icons[id];
+    };
 
-  this.getPlayers = function() {
-    const players = JSON.parse(storage.getItem('players'));
-    return players || null;
-  };
+    // Save a new icon
+    this.saveIcon = function(iconPath) {
+        const icons = this.getIcons();
+        icons['icon:' + uid()] = iconPath;
+        this._set('icons', icons);
+    };
+
+    this.removeIcon = function() {
+
+    };
+
+    this.setPlayers = function(players) {
+        this._set('players', players);
+    };
+
+    this.getPlayers = function() {
+        const players = this._get('players');
+        return players || null;
+    };
+
+    this.listen = function(map, callback) {
+        if (!this.hasMap(map)) return;
+
+        const dataKey = dataPrefix + mapPrefix + map;
+        window.addEventListener('storage', (change) => {
+            if (change.key === dataKey) {
+                const newMap = JSON.parse(change.newValue);
+                newMap['data:updated'] = null;
+                callback(newMap);
+            }
+        });
+    };
 };

@@ -1,0 +1,83 @@
+.image-picker {
+      position: absolute;
+      z-index: 1205;
+      top: 10vh;
+      background: #ffff;
+      width: 60vw;
+      left: 20vw;
+      cursor: default;
+      border: solid 3px #000;
+      box-shadow: 5px 5px 6px -3px #222;
+
+    h2 {
+        @include modal-h2;
+    }
+
+    main {
+        padding: 1rem;
+        overflow: auto;
+        height: 64vh;
+        div {
+            margin-top:1rem;
+            margin-bottom:.5rem;
+            border-bottom: solid 1px #ddd;
+        }
+        /* Add button */
+        span {
+            display:inline-block;
+            height: 60px;
+            line-height: 55px;
+            width: 55px;
+            text-align: center;
+            border: solid 1px #ddd;
+            font-size:1.2rem;
+            cursor:pointer;
+            vertical-align: top;
+
+            &::hover {
+                background: #efefef;
+            }
+        }
+
+        img {
+            width:55px; 
+            cursor:pointer;
+        }
+
+    }
+    footer {
+        background:$primary;
+        button {
+            padding: .8rem;
+            border-right: solid 1px #95e1c0;
+
+            &:hover {
+              background:$primary-hover;
+            }
+        }
+    }
+
+    &.uploadHover{
+        main {
+            filter: blur(3px);
+        }
+        div,  span, img, &:before {
+          pointer-events: none;
+        }
+        &:before {
+            content:"Drop image to add icon";
+            position: absolute;
+            left: calc(50% - 110px - .8rem);
+            width: 220px;
+            top: 15%;
+            font-size: 1.2rem;
+            border: solid 2px #24c37e;
+            padding: .8rem;
+            background: #24c37e;
+            z-index: 1;
+            text-align: center;
+            color:#fff;
+        }
+    } 
+}
+
