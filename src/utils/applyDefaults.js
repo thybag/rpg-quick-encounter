@@ -38,6 +38,7 @@ function applySettings(base, overrides) {
             base[key] = value;
         }
     }
+
     return base;
 }
 

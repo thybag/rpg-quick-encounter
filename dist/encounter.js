@@ -57,7 +57,7 @@
      * @param  {...[type]} args [description]
      * @return {[type]}         [description]
      */
-    function makeTemplate(...args) {
+    function Template$2(...args) {
         return new Template$1(...args);
     }
 
@@ -216,6 +216,7 @@
                     if (prop === 'get') return magicGet(parent, context);
                     if (prop === 'set') return magicSet(parent, context);
                     if (prop === 'on') return magicOn(parent, context);
+                    if (prop === 'trigger') return magicTrigger(parent, context);
                     if (prop === 'getContext') return () => context;
                     // Support json stringify by pass access to the real object
                     if (prop === 'toJSON') return () => _get(context);
@@ -527,6 +528,23 @@
     }
 
     /**
+     * Proxy access for `on`
+     * @param  {[type]} parent  [description]
+     * @param  {[type]} context [description]
+     * @return {[type]}         [description]
+     */
+    function magicTrigger(parent, context) {
+        return function(event, data) {
+            let listener = `${event}:${context}`;
+            if (event.includes(':')) {
+                const parts = event.split(':');
+                listener = `${parts[0]}:${context}.${parts[1]}`;
+            }
+            return parent.trigger(listener, data);
+        };
+    }
+
+    /**
      * getContext return datapath to current target.
      *
      * @param  {[type]} context [description]
@@ -581,7 +599,7 @@
 
             // Init templates
             if (this.template) {
-                this._template = makeTemplate({template: this.template, className: this.className});
+                this._template = Template$2({template: this.template, className: this.className});
             }
 
             // Init data
@@ -14873,6 +14891,238 @@
 
     });
 
+    let allocated = 0;
+
+    /**
+     * UID
+     * @return {string} Unique ID for this instance
+     */
+    function uid() {
+        return (new Date().getTime()) + '_' + (allocated++);
+    }
+
+    var localData = new function() {
+        const storage = window.localStorage;
+        const mapPrefix = 'map:';
+        let dataPrefix = '';
+
+        this.setDataPrefix = function(newPrefix) {
+            dataPrefix = newPrefix;
+        };
+        // Get helper to reteave a value from store
+        this._get = function(key) {
+            return JSON.parse(storage.getItem(dataPrefix + key));
+        };
+        // Set helper, to save a value to store
+        this._set = function(key, value) {
+            return storage.setItem(dataPrefix + key, JSON.stringify(value));
+        };
+        // Exists helper to check if value exists in store.
+        this._has = function(key) {
+            return (storage.getItem(dataPrefix + key));
+        };
+
+        this.hasMap = function(key) {
+            return (this._has(mapPrefix + key));
+        };
+
+        this.loadMap = function(key) {
+            const map = this._get(mapPrefix + key);
+            map['data:updated'] = null;
+            return map;
+        };
+
+        this.saveMap = function(key, data) {
+            const clean = JSON.parse(JSON.stringify(data));
+            // Inject last updated.
+            clean['data:updated'] = new Date();
+
+            return this._set(mapPrefix + key, clean);
+        };
+
+        // Get all map paths in dataPrefix
+        this.getMaps = function() {
+            // Find matching maps
+            const maps = Object.entries(storage).filter(
+                // Include only relevent maps
+                ([key, data]) => {
+                    return key.startsWith(dataPrefix + mapPrefix);
+                },
+            ).map(
+                // Parse in to real data
+                ([key, data]) => {
+                    return JSON.parse(data);
+                },
+            );
+
+            // Most recently used first
+            maps.sort(function(b, a) {
+                // Legacy issue for now is a lot of older maps won't have the updated date.
+                // For these assume it was 2020.
+                const d1 = (a['data:updated']) ? new Date(a['data:updated']) : new Date('2020-01-01');
+                const d2 = (b['data:updated']) ? new Date(b['data:updated']) : new Date('2020-01-01');
+                return d1-d2;
+            });
+
+            return maps;
+        };
+
+        // Get all icons
+        this.getIcons = function() {
+            const icons = this._get('icons');
+            return (icons) || {};
+        };
+
+        // get a single icon
+        this.getIcon = function(id) {
+            const icons = this.getIcons();
+            return icons[id];
+        };
+
+        // Save a new icon
+        this.saveIcon = function(iconPath) {
+            const icons = this.getIcons();
+            icons['icon:' + uid()] = iconPath;
+            this._set('icons', icons);
+        };
+
+        this.removeIcon = function() {
+
+        };
+
+        this.setPlayers = function(players) {
+            this._set('players', players);
+        };
+
+        this.getPlayers = function() {
+            const players = this._get('players');
+            return players || null;
+        };
+
+        this.listen = function(map, callback) {
+            if (!this.hasMap(map)) return;
+
+            const dataKey = dataPrefix + mapPrefix + map;
+            window.addEventListener('storage', (change) => {
+                if (change.key === dataKey) {
+                    const newMap = JSON.parse(change.newValue);
+                    newMap['data:updated'] = null;
+                    callback(newMap);
+                }
+            });
+        };
+    };
+
+    // Player icons
+    const playerIcons = 9;
+    const monsterIcons = 33;
+    let iconPath = 'assets/';
+
+    const iconList$3 = []; const monsterList = [];
+
+    for (let i = 1; i <= playerIcons; i++) iconList$3.push('p:' + i);
+    for (let i = 1; i <= monsterIcons; i++) monsterList.push('m:' + i);
+
+    // Get all player icons
+    const getPlayerIcons = function() {
+        return iconList$3;
+    };
+    // Get all monster icons
+    const getMonsterIcons = function() {
+        return monsterList;
+    };
+
+    // Get all custom icons
+    const getCustomIcons = function() {
+        return Object.keys(localData.getIcons());
+    };
+
+    // Get random player icon
+    const getRandomPlayerIcon = function() {
+        return iconList$3[Math.floor((Math.random() * iconList$3.length))];
+    };
+
+    // Get random monster icon
+    const getRandomMonsterIcon = function() {
+        return monsterList[Math.floor((Math.random() * monsterList.length))];
+    };
+
+    // Get player icons as unique list
+    const getRandomPlayerIconList = function() {
+        // No point using a smarter algo for 8 elements.
+        return iconList$3.sort(() => Math.random() - 0.5);
+    };
+
+    // Change icon path if being used via another app
+    const setIconPath = function(path) {
+        iconPath = path;
+    };
+
+    /**
+     * Convert icon to a usable image path
+     *
+     * @param  {[type]} icon [description]
+     * @return {[type]}      [description]
+     */
+    function getIconImage(icon) {
+        if (!icon) {
+            return '';
+        }
+
+        if (icon.startsWith('icon:')) {
+            return localData.getIcon(icon);
+        }
+        if (icon.startsWith('p:')) {
+            return `${iconPath}players/${icon.substr(2)}.png`;
+        }
+        if (icon.startsWith('m:')) {
+            return `${iconPath}monsters/${icon.substr(2)}.png`;
+        }
+
+        return icon;
+    }
+
+    /**
+     * Make text safe to include in html
+     *
+     * @param  {[type]} text [description]
+     * @return {[type]}      [description]
+     */
+    function safeText(text) {
+        // Render as text node
+        const html = document.createElement('p');
+        html.appendChild(document.createTextNode(text));
+        return html.innerHTML;
+    }
+
+    /**
+     * Create a reusable template
+     * @param {[type]} methods [description]
+     */
+    function Template(methods) {
+        this.render = function(...args) {
+            // Escape input values
+            if (methods.safe !== false) {
+                // Ensure args are safe
+                args = args.map((value) => {
+                    return safeText(value);
+                });
+            }
+
+            // Render template itself
+            const container = document.createElement('div');
+            const tpl = methods.template(...args);
+            container.innerHTML = tpl;
+
+            if (methods.className) {
+                container.className = methods.className;
+            }
+
+            // Return element
+            return container;
+        };
+    }
+
     /**
      * Confirm we can access provided image.
      *
@@ -14888,38 +15138,389 @@
         });
     }
 
+    const iconList$2 = new Template({
+        template: () => {
+            let NPCList = ''; let MonsterList = ''; let CustomList = '';
+
+            getPlayerIcons().forEach((i) => {
+                NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+            });
+            getMonsterIcons().forEach((i) => {
+                MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+            });
+            getCustomIcons().forEach((i) => {
+                CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
+            });
+
+            return `
+      <div>Your images</div>
+          <span>+</span> 
+          ${CustomList}
+      <div>NPCs/Players</div>
+          ${NPCList}
+      <div>Monsters</div>
+          ${MonsterList}
+      `;
+        },
+    });
+
     /**
-     * Create leaflet map instance based on provided image
+     * load filedata from upload
      *
-     * @param  {[type]} target  [description]
-     * @param  {[type]} mapPath [description]
+     * @param  {[type]} iconImg [description]
      * @return {[type]}         [description]
      */
-    async function createMap(target, mapPath) {
-        const img = await checkImage(mapPath);
-
-        // Create map
-        const map = leafletSrc.map(target, {
-            crs: leafletSrc.CRS.Simple,
-            zoomSnap: 0.20,
+    async function loadFile$2(iconImg) {
+        const imgData = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(iconImg);
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
         });
 
-        // Config map size
-        const width = Math.round(img.width / 10);
-        const height = Math.round(img.height / 10);
-        const bounds = [[0, 0], [height, width]];
-
-        leafletSrc.imageOverlay(mapPath, bounds).addTo(map);
-        map.fitBounds(bounds);
-
-        // Config defualt map zoom.
-        const zoom = map.getZoom();
-        map.setZoom(zoom + 0.5);
-        map.setMaxZoom(zoom + 4);
-        map.setMinZoom(zoom - 0.5);
-
-        return map;
+        return checkImage(imgData);
     }
+
+    /**
+     * resize and return as final icon image to store
+     *
+     * @param  {[type]} iconImg [description]
+     * @return {[type]}         [description]
+     */
+    async function imageToIcon$2(iconImg) {
+        const img = await loadFile$2(iconImg);
+
+        // Local storage is small so we wanna scale it down before we save
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // draw source image into the off-screen canvas:
+        canvas.width = 70;
+        canvas.height = 70;
+        ctx.drawImage(img, 0, 0, 70, 70);
+
+        return canvas.toDataURL('image/webp', 0.8);
+    }
+
+    var ImagePicker$2 = Component$1.define({
+        initialize: function(options) {
+            this.el = this.tpl();
+            this.parent = options.target;
+
+            this.render();
+            // Add to world
+            document.body.appendChild(this.el);
+        },
+        className: 'modal',
+        template: () => {
+            return `
+            <div class='image-picker'>
+                <h2>Image picker</h2>
+                 <main></main>
+                <footer><button>Cancel</button></footer>
+            </div>
+        `;
+        },
+        events: {
+            'click img': 'select',
+            'click span': 'addIcon',
+            // Close options
+            'click button': 'close',
+            'click .modal': 'close',
+            // Upload options
+            'dragover main': 'uploadEnable',
+            'drop main': 'upload',
+            'dragenter main': 'uploadFocus',
+            'dragleave main': 'uploadBlur',
+        },
+        uploadEnable: function(e) {
+            // Need this to be able to upload.
+            e.preventDefault();
+        },
+        select: function(e, item) {
+            this.parent.src = item.src;
+            this.parent.dataset.id = (item.dataset.id) ? item.dataset.id : item.src;
+
+            this.close();
+        },
+        close: function() {
+            this.destroy();
+        },
+        uploadFocus: function(e) {
+            e.preventDefault();
+            this.el.querySelector('.image-picker').classList.add('uploadHover');
+        },
+        uploadBlur: function(e) {
+            e.preventDefault();
+            this.el.querySelector('.image-picker').classList.remove('uploadHover');
+        },
+        upload: async function(e) {
+            e.preventDefault();
+
+            const files = e.dataTransfer.files;
+
+            // Get files that were dragged
+            for (let f = 0; f < files.length; f++) {
+                const file = files[f];
+                // Only deal with images
+                if (!file.type.match('image.*')) continue;
+
+                const newIcon = await imageToIcon$2(file);
+                localData.saveIcon(newIcon);
+            }
+            this.render();
+            this.uploadBlur(e);
+        },
+        addIcon: async function() {
+            const iconPath = prompt('Icon image url');
+            if (iconPath) {
+                try {
+                    await checkImage(iconPath);
+                    localData.saveIcon(iconPath);
+                    this.render();
+                } catch (e) {
+                    alert('failed to load image');
+                }
+            }
+        },
+        render: async function() {
+            this.el.querySelector('main').innerHTML = iconList$2.render().innerHTML;
+        },
+    });
+
+    var BaseMobModal = Component$1.define({
+        // Templates
+        className: 'modal',
+        template: (title, name, icon) => {
+            return `
+            <div class='spawn-controls' aria-modal="true" role="dialog">
+                <h2>${title}</h2>
+                <img src="${getIconImage(icon)}" data-id="${icon}">
+                <div>
+                    <label>Name</label>
+                    <input type="text" value="${name}" placeholder="Player name...">
+                    <input type='submit' value="Save">
+                </div>
+            </div>
+        `;
+        },
+        // Events
+        events: {
+            'click .modal': 'close',
+            'click img': 'openPickList',
+            'click input[type=submit]': 'save',
+            'keyup input[type=text]': 'detectSubmit',
+        },
+        // Save via keyboard
+        detectSubmit: function(e) {
+            if (e.key == 'Enter' || e.keyCode == 13) {
+                this.save();
+            }
+        },
+        // Remove modal
+        close: function() {
+            this.destroy();
+        },
+        // Open image picker
+        openPickList: function(e, target) {
+            ImagePicker$2.make({target});
+        },
+        focus: function(e) {
+            // Set focus to input
+            const input = this.el.querySelector('input[type=text]');
+            // Ensure selection is the end of the current value
+            input.selectionStart = input.selectionEnd = input.value.length;
+            input.focus();
+        },
+    });
+
+    var EditMobModal = BaseMobModal.define({
+        initialize: function(options) {
+            this.target = options.target;
+
+            // Render base template
+            this.el = this.tpl(
+                'Update Mob',
+                this.target.name,
+                this.target.icon,
+            );
+
+            // Create self on the global level as needed.
+            document.body.appendChild(this.el);
+            this.focus();
+        },
+        // Save data to target
+        save: function(e, target) {
+            this.target.name = this.el.querySelector('input[type=text]').value;
+            this.target.icon = this.el.querySelector('img').dataset.id;
+            this.close();
+        },
+    });
+
+    var ConfirmModal = Component$1.define({
+        callback: function() {},
+        initialize: function(options) {
+            this.callback = options.callback;
+
+            // Render base template
+            this.el = this.tpl(
+                options.question,
+            );
+
+            // Create self on the global level as needed.
+            document.body.appendChild(this.el);
+        },
+        // Events
+        events: {
+            'click button.cancel': 'close',
+            'click button.confirm': 'confirm',
+        },
+        // Templates
+        className: 'modal',
+        template: (question) => {
+            return `
+            <div class='confirm-modal'>
+                <h2>${question}</h2>
+                <div>
+                    <button class="confirm">Yes</button>
+                    <button class="cancel">No</button>
+                </div>
+            </div>
+        `;
+        },
+        // Save data to target
+        confirm: function(e, target) {
+            this.callback();
+            this.close();
+        },
+
+        // Remove modal
+        close: function() {
+            this.destroy();
+        },
+    });
+
+    /**
+     * Make Leaflet Marker
+     *
+     * @param  {[type]} position  [description]
+     * @return {[type]}      [description]
+     */
+    function makeMarker(position) {
+        return leafletSrc.marker(
+            position,
+            {
+                icon: leafletSrc.divIcon(),
+                draggable: true,
+            },
+        );
+    }
+
+    // Used to ensure bring to front always works.
+    let globalZIndexOffset = 0;
+
+    var Character = Component$1.define({
+        marker: null,
+        ref: null,
+        map: null,
+        // Events
+        events: {
+            'marker:click': 'bringToFront',
+            'marker:dblclick': 'characterDblClick',
+            'marker:dragstart': 'bringToFront',
+            'marker:dragend': 'characterDragend',
+            'marker:contextmenu': 'characterRemove',
+            'data:change': 'render',
+            'data:focus': 'panTo',
+        },
+        initialize: function({ref, map}) {
+            // Store key vals
+            this.ref = ref;
+            this.map = map;
+
+            // Set initial position if not already defined.
+            if (!this.ref.x || !this.ref.y) {
+                this.ref.x = map.getCenter().lng;
+                this.ref.y = map.getCenter().lat;
+            }
+
+            this.marker = makeMarker(
+                leafletSrc.latLng(this.ref.x, this.ref.y),
+            );
+
+            // Register events
+            this.marker.on('click', (e) => this.trigger('marker:click', e));
+            this.marker.on('dblclick', (e) => this.trigger('marker:dblclick', e));
+            this.marker.on('dragstart', (e) => this.trigger('marker:dragstart', e));
+            this.marker.on('dragend', (e) => this.trigger('marker:dragend', e));
+            this.marker.on('contextmenu', (e) => this.trigger('marker:contextmenu', e));
+
+            this.map.on('zoom', (e) => this.trigger('marker:zoom', e));
+            this.map.on('zoomend', (e) => this.trigger('marker:zoomend', e));
+            this.map.on('zoomstart', (e) => this.trigger('marker:zoomstart', e));
+
+            this.ref.on('update', (e) => this.trigger('data:change', e));
+            this.ref.on('focus', (e) => this.trigger('data:focus', e));
+
+            // Make icon
+            this.render();
+        },
+        template: (name, icon) => {
+            return `
+            <img src="${getIconImage(icon)}">
+            <span>${name}</span>
+        `;
+        },
+        panTo: function() {
+            this.map.panTo(this.marker.getLatLng());
+        },
+        bringToFront: function(event) {
+            event.preventDefault;
+            // Bring character to the front
+            globalZIndexOffset++;
+            this.marker.setZIndexOffset(globalZIndexOffset*1000);
+        },
+        characterDblClick: function(event) {
+            event.preventDefault;
+            EditMobModal.make({target: this.ref});
+        },
+        characterDragend: function(event) {
+            const latLng = event.target.getLatLng();
+            // Sync
+            this.ref.x = latLng.lat;
+            this.ref.y = latLng.lng;
+        },
+        characterRemove: function(event) {
+            event.preventDefault;
+
+            ConfirmModal.make({
+                question: `Remove ${this.ref.name} from map?`,
+                callback: () => {
+                    this.ref.spawned = false;
+                },
+            });
+        },
+        render: function() {
+            // Sync spawned?
+            if (!this.ref.spawned || this.ref.removed) {
+                this.marker.remove();
+            } else {
+                this.marker.addTo(this.map);
+            }
+
+            // Sync position
+            this.marker.setLatLng([this.ref.x, this.ref.y]);
+            // Sync icon
+            this.marker.setIcon(
+                leafletSrc.divIcon({
+                    className: 'character-icon',
+                    html: this.tpl(this.ref.name, this.ref.icon),
+                    iconSize: [60, 80],
+                    iconAnchor: [35, 35],
+                }),
+            );
+        },
+    });
 
     /**
      * Create a polygon to represent a circle of a given size
@@ -17709,465 +18310,48 @@
         return leafletSrc.fog(map.getBounds()).addTo(map);
     }
 
-    let allocated = 0;
-
     /**
-     * UID
-     * @return {string} Unique ID for this instance
-     */
-    function uid() {
-        return (new Date().getTime()) + '_' + (allocated++);
-    }
-
-    var localData = new function() {
-        const storage = window.localStorage;
-        const mapPrefix = 'map:';
-        let dataPrefix = '';
-
-        this.setDataPrefix = function(newPrefix) {
-            dataPrefix = newPrefix;
-        };
-        // Get helper to reteave a value from store
-        this._get = function(key) {
-            return JSON.parse(storage.getItem(dataPrefix + key));
-        };
-        // Set helper, to save a value to store
-        this._set = function(key, value) {
-            return storage.setItem(dataPrefix + key, JSON.stringify(value));
-        };
-        // Exists helper to check if value exists in store.
-        this._has = function(key) {
-            return (storage.getItem(dataPrefix + key));
-        };
-
-        this.hasMap = function(key) {
-            return (this._has(mapPrefix + key));
-        };
-
-        this.loadMap = function(key) {
-            const map = this._get(mapPrefix + key);
-            map['data:updated'] = null;
-            return map;
-        };
-
-        this.saveMap = function(key, data) {
-            const clean = JSON.parse(JSON.stringify(data));
-            // Inject last updated.
-            clean['data:updated'] = new Date();
-
-            return this._set(mapPrefix + key, clean);
-        };
-
-        // Get all map paths in dataPrefix
-        this.getMaps = function() {
-            // Find matching maps
-            const maps = Object.entries(storage).filter(
-                // Include only relevent maps
-                ([key, data]) => {
-                    return key.startsWith(dataPrefix + mapPrefix);
-                },
-            ).map(
-                // Parse in to real data
-                ([key, data]) => {
-                    return JSON.parse(data);
-                },
-            );
-
-            // Most recently used first
-            maps.sort(function(b, a) {
-                // Legacy issue for now is a lot of older maps won't have the updated date.
-                // For these assume it was 2020.
-                const d1 = (a['data:updated']) ? new Date(a['data:updated']) : new Date('2020-01-01');
-                const d2 = (b['data:updated']) ? new Date(b['data:updated']) : new Date('2020-01-01');
-                return d1-d2;
-            });
-
-            return maps;
-        };
-
-        // Get all icons
-        this.getIcons = function() {
-            const icons = this._get('icons');
-            return (icons) || {};
-        };
-
-        // get a single icon
-        this.getIcon = function(id) {
-            const icons = this.getIcons();
-            return icons[id];
-        };
-
-        // Save a new icon
-        this.saveIcon = function(iconPath) {
-            const icons = this.getIcons();
-            icons['icon:' + uid()] = iconPath;
-            this._set('icons', icons);
-        };
-
-        this.removeIcon = function() {
-
-        };
-
-        this.setPlayers = function(players) {
-            this._set('players', players);
-        };
-
-        this.getPlayers = function() {
-            const players = this._get('players');
-            return players || null;
-        };
-
-        this.listen = function(map, callback) {
-            if (!this.hasMap(map)) return;
-
-            const dataKey = dataPrefix + mapPrefix + map;
-            window.addEventListener('storage', (change) => {
-                if (change.key === dataKey) {
-                    const newMap = JSON.parse(change.newValue);
-                    newMap['data:updated'] = null;
-                    callback(newMap);
-                }
-            });
-        };
-    };
-
-    // Player icons
-    const playerIcons = 9;
-    const monsterIcons = 33;
-    let iconPath = 'assets/';
-
-    const iconList$3 = []; const monsterList = [];
-
-    for (let i = 1; i <= playerIcons; i++) iconList$3.push('p:' + i);
-    for (let i = 1; i <= monsterIcons; i++) monsterList.push('m:' + i);
-
-    // Get all player icons
-    const getPlayerIcons = function() {
-        return iconList$3;
-    };
-    // Get all monster icons
-    const getMonsterIcons = function() {
-        return monsterList;
-    };
-
-    // Get all custom icons
-    const getCustomIcons = function() {
-        return Object.keys(localData.getIcons());
-    };
-
-    // Get random player icon
-    const getRandomPlayerIcon = function() {
-        return iconList$3[Math.floor((Math.random() * iconList$3.length))];
-    };
-
-    // Get random monster icon
-    const getRandomMonsterIcon = function() {
-        return monsterList[Math.floor((Math.random() * monsterList.length))];
-    };
-
-    // Get player icons as unique list
-    const getRandomPlayerIconList = function() {
-        // No point using a smarter algo for 8 elements.
-        return iconList$3.sort(() => Math.random() - 0.5);
-    };
-
-    // Change icon path if being used via another app
-    const setIconPath = function(path) {
-        iconPath = path;
-    };
-
-    /**
-     * Convert icon to a usable image path
+     * Create leaflet map instance based on provided image
      *
-     * @param  {[type]} icon [description]
-     * @return {[type]}      [description]
-     */
-    function getIconImage(icon) {
-        if (!icon) {
-            return '';
-        }
-
-        if (icon.startsWith('icon:')) {
-            return localData.getIcon(icon);
-        }
-        if (icon.startsWith('p:')) {
-            return `${iconPath}players/${icon.substr(2)}.png`;
-        }
-        if (icon.startsWith('m:')) {
-            return `${iconPath}monsters/${icon.substr(2)}.png`;
-        }
-
-        return icon;
-    }
-
-    /**
-     * Make text safe to include in html
-     *
-     * @param  {[type]} text [description]
-     * @return {[type]}      [description]
-     */
-    function safeText(text) {
-        // Render as text node
-        const html = document.createElement('p');
-        html.appendChild(document.createTextNode(text));
-        return html.innerHTML;
-    }
-
-    /**
-     * Create a reusable template
-     * @param {[type]} methods [description]
-     */
-    function Template(methods) {
-        this.render = function(...args) {
-            // Escape input values
-            if (methods.safe !== false) {
-                // Ensure args are safe
-                args = args.map((value) => {
-                    return safeText(value);
-                });
-            }
-
-            // Render template itself
-            const container = document.createElement('div');
-            const tpl = methods.template(...args);
-            container.innerHTML = tpl;
-
-            if (methods.className) {
-                container.className = methods.className;
-            }
-
-            // Return element
-            return container;
-        };
-    }
-
-    const iconList$2 = new Template({
-        template: () => {
-            let NPCList = ''; let MonsterList = ''; let CustomList = '';
-
-            getPlayerIcons().forEach((i) => {
-                NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-            });
-            getMonsterIcons().forEach((i) => {
-                MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-            });
-            getCustomIcons().forEach((i) => {
-                CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-            });
-
-            return `
-      <div>Your images</div>
-          <span>+</span> 
-          ${CustomList}
-      <div>NPCs/Players</div>
-          ${NPCList}
-      <div>Monsters</div>
-          ${MonsterList}
-      `;
-        },
-    });
-
-    /**
-     * load filedata from upload
-     *
-     * @param  {[type]} iconImg [description]
+     * @param  {[type]} target  [description]
+     * @param  {[type]} mapPath [description]
      * @return {[type]}         [description]
      */
-    async function loadFile$2(iconImg) {
-        const imgData = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(iconImg);
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = reject;
+    async function createMap(target, mapPath) {
+        const img = await checkImage(mapPath);
+
+        // Create map
+        const map = leafletSrc.map(target, {
+            crs: leafletSrc.CRS.Simple,
+            zoomSnap: 0.20,
         });
 
-        return checkImage(imgData);
+        // Config map size
+        const width = Math.round(img.width / 10);
+        const height = Math.round(img.height / 10);
+        const bounds = [[0, 0], [height, width]];
+
+        leafletSrc.imageOverlay(mapPath, bounds).addTo(map);
+        map.fitBounds(bounds);
+
+        // Config defualt map zoom.
+        const zoom = map.getZoom();
+        map.setZoom(zoom + 0.5);
+        map.setMaxZoom(zoom + 4);
+        map.setMinZoom(zoom - 0.5);
+
+        return map;
     }
 
-    /**
-     * resize and return as final icon image to store
-     *
-     * @param  {[type]} iconImg [description]
-     * @return {[type]}         [description]
-     */
-    async function imageToIcon$2(iconImg) {
-        const img = await loadFile$2(iconImg);
-
-        // Local storage is small so we wanna scale it down before we save
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
-        // draw source image into the off-screen canvas:
-        canvas.width = 70;
-        canvas.height = 70;
-        ctx.drawImage(img, 0, 0, 70, 70);
-
-        return canvas.toDataURL('image/webp', 0.8);
-    }
-
-    var ImagePicker$2 = Component$1.define({
-        initialize: function(options) {
-            this.el = this.tpl();
-            this.parent = options.target;
-
-            this.render();
-            // Add to world
-            document.body.appendChild(this.el);
-        },
-        className: 'modal',
-        template: () => {
-            return `
-            <div class='image-picker'>
-                <h2>Image picker</h2>
-                 <main></main>
-                <footer><button>Cancel</button></footer>
-            </div>
-        `;
-        },
-        events: {
-            'click img': 'select',
-            'click span': 'addIcon',
-            // Close options
-            'click button': 'close',
-            'click .modal': 'close',
-            // Upload options
-            'dragover main': 'uploadEnable',
-            'drop main': 'upload',
-            'dragenter main': 'uploadFocus',
-            'dragleave main': 'uploadBlur',
-        },
-        uploadEnable: function(e) {
-            // Need this to be able to upload.
-            e.preventDefault();
-        },
-        select: function(e, item) {
-            this.parent.src = item.src;
-            this.parent.dataset.id = (item.dataset.id) ? item.dataset.id : item.src;
-
-            this.close();
-        },
-        close: function() {
-            this.destroy();
-        },
-        uploadFocus: function(e) {
-            e.preventDefault();
-            this.el.querySelector('.image-picker').classList.add('uploadHover');
-        },
-        uploadBlur: function(e) {
-            e.preventDefault();
-            this.el.querySelector('.image-picker').classList.remove('uploadHover');
-        },
-        upload: async function(e) {
-            e.preventDefault();
-
-            const files = e.dataTransfer.files;
-
-            // Get files that were dragged
-            for (let f = 0; f < files.length; f++) {
-                const file = files[f];
-                // Only deal with images
-                if (!file.type.match('image.*')) continue;
-
-                const newIcon = await imageToIcon$2(file);
-                localData.saveIcon(newIcon);
-            }
-            this.render();
-            this.uploadBlur(e);
-        },
-        addIcon: async function() {
-            const iconPath = prompt('Icon image url');
-            if (iconPath) {
-                try {
-                    await checkImage(iconPath);
-                    localData.saveIcon(iconPath);
-                    this.render();
-                } catch (e) {
-                    alert('failed to load image');
-                }
-            }
-        },
-        render: async function() {
-            this.el.querySelector('main').innerHTML = iconList$2.render().innerHTML;
-        },
-    });
-
-    var BaseMobModal = Component$1.define({
-        // Templates
-        className: 'modal',
-        template: (title, name, icon) => {
-            return `
-            <div class='spawn-controls' aria-modal="true" role="dialog">
-                <h2>${title}</h2>
-                <img src="${getIconImage(icon)}" data-id="${icon}">
-                <div>
-                    <label>Name</label>
-                    <input type="text" value="${name}" placeholder="Player name...">
-                    <input type='submit' value="Save">
-                </div>
-            </div>
-        `;
-        },
-        // Events
-        events: {
-            'click .modal': 'close',
-            'click img': 'openPickList',
-            'click input[type=submit]': 'save',
-            'keyup input[type=text]': 'detectSubmit',
-        },
-        // Save via keyboard
-        detectSubmit: function(e) {
-            if (e.key == 'Enter' || e.keyCode == 13) {
-                this.save();
-            }
-        },
-        // Remove modal
-        close: function() {
-            this.destroy();
-        },
-        // Open image picker
-        openPickList: function(e, target) {
-            ImagePicker$2.make({target});
-        },
-        focus: function(e) {
-            // Set focus to input 
-            const input = this.el.querySelector('input[type=text]');
-            // Ensure selection is the end of the current value
-            input.selectionStart = input.selectionEnd = input.value.length;
-            input.focus();
-        }
-    });
-
-    var EditMobModal = BaseMobModal.define({
-        initialize: function(options) {
-            this.target = options.target;
-
-            // Render base template
-            this.el = this.tpl(
-                'Update Mob',
-                this.target.name,
-                this.target.icon,
-            );
-
-            // Create self on the global level as needed.
-            document.body.appendChild(this.el);
-            this.focus();
-        },
-        // Save data to target
-        save: function(e, target) {
-            this.target.name = this.el.querySelector('input[type=text]').value;
-            this.target.icon = this.el.querySelector('img').dataset.id;
-            this.close();
-        },
-    });
-
-    var ConfirmModal = Component$1.define({
+    var WarningModal = Component$1.define({
         callback: function() {},
         initialize: function(options) {
             this.callback = options.callback;
 
             // Render base template
             this.el = this.tpl(
-                options.question,
+                options.notice,
+                options.explanation
             );
 
             // Create self on the global level as needed.
@@ -18175,18 +18359,17 @@
         },
         // Events
         events: {
-            'click button.cancel': 'close',
             'click button.confirm': 'confirm',
         },
         // Templates
         className: 'modal',
-        template: (question) => {
+        template: (notice, explanation) => {
             return `
             <div class='confirm-modal'>
-                <h2>${question}</h2>
+                <h2>${notice}</h2>
+                ${explanation ? `<p>${explanation}</p>` : ''}
                 <div>
-                    <button class="confirm">Yes</button>
-                    <button class="cancel">No</button>
+                    <button class="confirm">Okay</button>
                 </div>
             </div>
         `;
@@ -18195,130 +18378,6 @@
         confirm: function(e, target) {
             this.callback();
             this.close();
-        },
-
-        // Remove modal
-        close: function() {
-            this.destroy();
-        },
-    });
-
-    /**
-     * Make Leaflet Marker
-     *
-     * @param  {[type]} position  [description]
-     * @return {[type]}      [description]
-     */
-    function makeMarker(position) {
-        return leafletSrc.marker(
-            position,
-            {
-                icon: leafletSrc.divIcon(),
-                draggable: true,
-            },
-        );
-    }
-
-    let globalZIndexOffset = 0;
-
-    var Character = Component$1.define({
-        marker: null,
-        ref: null,
-        map: null,
-        // Events
-        events: {
-            'marker:click': 'bringToFront',
-            'marker:dblclick': 'characterDblClick',
-            'marker:dragstart': 'bringToFront',
-            'marker:dragend': 'characterDragend',
-            'marker:contextmenu': 'characterRemove',
-            'data:change': 'render',
-        },
-        initialize: function({ref, map}) {
-            // Store key vals
-            this.ref = ref;
-            this.map = map;
-
-            // Set initial position if not already defined.
-            if (!this.ref.x || !this.ref.y) {
-                this.ref.x = map.getCenter().lng;
-                this.ref.y = map.getCenter().lat;
-            }
-
-            this.marker = makeMarker(
-                leafletSrc.latLng(this.ref.x, this.ref.y),
-            );
-
-            // Register events
-            this.marker.on('click', (e) => this.trigger('marker:click', e));
-            this.marker.on('dblclick', (e) => this.trigger('marker:dblclick', e));
-            this.marker.on('dragstart', (e) => this.trigger('marker:dragstart', e));
-            this.marker.on('dragend', (e) => this.trigger('marker:dragend', e));
-            this.marker.on('contextmenu', (e) => this.trigger('marker:contextmenu', e));
-
-            this.map.on('zoom', (e) => this.trigger('marker:zoom', e));
-            this.map.on('zoomend', (e) => this.trigger('marker:zoomend', e));
-            this.map.on('zoomstart', (e) => this.trigger('marker:zoomstart', e));
-
-            this.ref.on('update', (e) => this.trigger('data:change', e));
-
-            // Make icon
-            this.render();
-        },
-        template: (name, icon) => {
-            return `
-            <img src="${getIconImage(icon)}">
-            <span>${name}</span>
-        `;
-        },
-        panTo: function() {
-            this.map.panTo(this.marker.getLatLng());
-        },
-        bringToFront: function(event) {
-            event.preventDefault;
-            // Bring character to the front
-            globalZIndexOffset++;
-            this.marker.setZIndexOffset(globalZIndexOffset*1000);
-        },
-        characterDblClick: function(event) {
-            event.preventDefault;
-            EditMobModal.make({target: this.ref});
-        },
-        characterDragend: function(event) {
-            const latLng = event.target.getLatLng();
-            // Sync
-            this.ref.x = latLng.lat;
-            this.ref.y = latLng.lng;
-        },
-        characterRemove: function(event) {
-            event.preventDefault;
-
-            ConfirmModal.make({
-                question: 'Remove character from map?',
-                callback: () => {
-                    this.ref.spawned = false;
-                },
-            });
-        },
-        render: function() {
-            // Sync spawned?
-            if (!this.ref.spawned || this.ref.removed) {
-                this.marker.remove();
-            } else {
-                this.marker.addTo(this.map);
-            }
-
-            // Sync position
-            this.marker.setLatLng([this.ref.x, this.ref.y]);
-            // Sync icon
-            this.marker.setIcon(
-                leafletSrc.divIcon({
-                    className: 'character-icon',
-                    html: this.tpl(this.ref.name, this.ref.icon),
-                    iconSize: [60, 80],
-                    iconAnchor: [35, 35],
-                }),
-            );
         },
     });
 
@@ -18336,12 +18395,21 @@
         fog: null,
         // Setup
         initialize: async function(config) {
-        // SetID
+            // SetID
             this.el.id = 'map';
             this.options = config.state;
 
             // Setup map itself
-            this.map = await createMap('map', this.options.get('map'));
+            try {
+                this.map = await createMap('map', this.options.get('map'));
+            } catch (e) {
+                // Fatal error, map cannot be loaded. Abort and show error.
+                return WarningModal.make({
+                    notice: "Unable to load map image",
+                    explanation: "The map URL you have provided can not be loaded. Please check that the URL is correct and refers directly to the map image you would like to use.",
+                    callback: (e) => { window.location.href = window.location.pathname; }
+                });
+            }
             this.fog = fogOfWar(this.map);
 
             // Register leaflet Listeners
@@ -18359,7 +18427,6 @@
             // Local events
             'map:click': 'fogClear',
             'map:contextmenu': 'fogAdd',
-            'map:player:focus': 'focusPlayer',
             // mob data listeners
             'create:players.*': 'spawnPlayer',
             'create:spawns.*': 'spawnNpc',
@@ -18385,9 +18452,6 @@
         },
         generateMarker: function(name, img, ref) {
             return Character.make({ref: ref, map: this.map});
-        },
-        focusPlayer: function(player) {
-            playerToIconMap[player.id].panTo();
         },
         fogToggled: function(newValue) {
             if (newValue) {
@@ -18577,8 +18641,7 @@
                 return;
             }
 
-            // If already spawned lets focus them
-            this.trigger('map:player:focus', player);
+            player.trigger('focus');
         },
         makePlayerCard: function(player) {
             // Skip removed players
@@ -18923,9 +18986,9 @@
             this.el.style.display = (this.data.visible) ? 'block' : 'none';
             this.focus();
         },
-        focus: function(){
+        focus: function() {
             if (this.data.visible) this.el.querySelector('input[type=text]').focus();
-        }
+        },
     });
 
     var Controls = Component$1.define({
@@ -19024,6 +19087,7 @@
      * @return {[type]}           [description]
      */
     function applySettings(base, overrides) {
+
         for (const [key, value] of Object.entries(overrides)) {
             if (typeof value === 'object' && value !== null) {
                 base[key] = applySettings(base[key] ?? {}, value);
@@ -19031,6 +19095,7 @@
                 base[key] = value;
             }
         }
+
         return base;
     }
 
@@ -19053,7 +19118,7 @@
 
     var Encounter = Component$1.define({
         initialize: function(config) {
-        // Take control of root
+            // Take control of root
             this.el.classList = 'app';
 
             // Apply defaults and sanity check
@@ -19088,21 +19153,16 @@
             this.el.appendChild(controlEl);
 
             // Boot Core Components
-            const map = EncounterMap.make({el: mapEl, state: mapState});
-            const players = Players.make({el: playerEl, players: mapState.get('players')});
+            EncounterMap.make({el: mapEl, state: mapState});
+            Players.make({el: playerEl, players: mapState.get('players')});
             Controls.make({el: controlEl, state: mapState});
 
             this.initSync(mapState);
-     
-            /* to refactor */
-            players.on('map:player:focus', function(player) {
-                map.trigger('map:player:focus', player);
-            });
         },
-        initSync: function(mapState){
+        initSync: function(mapState) {
             const map = mapState.get('map');
             let sync = true;
-            
+
             // Listen for local storage being changed on this map
             localData.listen(map, function(updated) {
                 // disable sync while changes are applied.
@@ -19122,9 +19182,9 @@
 
             // Commit changes if sync is enabled at time change is applied.
             mapState.on('updated', () => {
-                if(sync) commitChanges();
+                if (sync) commitChanges();
             });
-        }
+        },
     });
 
     const iconList = new Template({
@@ -19277,27 +19337,16 @@
         },
     });
 
-    const wizardPlayersTpl = new Template({
-        template: () => {
-            return `
-        <h2>Players</h2>
-        <div></div>
-        <button>Add another player</button>
-    `;
-        },
-    });
-
     const playerTpl = new Template({
         template: (name, icon) => {
             return `
-        <span class="icon"><img src="${getIconImage(icon)}" data-id="${icon}"></span>
-        <input type='text' name="name" value="${name}">
-        <span class="remove">X</span>
+        <span class="icon"><img src="${getIconImage(icon)}" data-id="${icon}" title="Click to change icon."></span>
+        <input type='text' name="name" value="${name}" placeholder="Player name">
+        <span class="remove" title="Remove player">X</span>
     `;
         },
         className: 'player-option',
     });
-
 
     const defaultPlayers$1 = [
         {name: 'Caster'},
@@ -19310,7 +19359,7 @@
     var AddPlayers = Component$1.define({
         playerTarget: null,
         initialize: function(config) {
-            this.el = wizardPlayersTpl.render();
+            this.el = this.tpl();
 
             const icons = getRandomPlayerIconList();
             this.playerTarget = this.el.querySelector('div');
@@ -19320,6 +19369,13 @@
             players.forEach((p, idx) => {
                 this.createPlayerRow({name: p.name, icon: p.icon || icons[idx]});
             });
+        },
+        template: () => {
+            return `
+        <h2>Players</h2>
+        <div></div>
+        <button>Add another player</button>
+    `;
         },
         events: {
             'click img': 'openPickList',
@@ -19360,7 +19416,7 @@
         },
     });
 
-    const savesTlp = new Template({
+    const savesTlp = new Template$2({
         'template': (saves) => {
             return `
       <h2>Your existing saves</h2>
@@ -19436,9 +19492,12 @@
             if (e.key == 'Enter' || e.keyCode == 13) {
                 this.startEncounter();
             }
+            // Clear custom validation on change
+            e.target.setCustomValidity('');
         },
         startEncounter: async function() {
             const mapInput = this.el.querySelector('input[name=map]');
+            const mapPath = mapInput.value;
 
             // Check its a url
             if (!mapInput.checkValidity()) {
@@ -19448,14 +19507,26 @@
 
             // Check its a valid image
             try {
-                await checkImage(mapInput.value);
+                await checkImage(mapPath);
             } catch (e) {
                 mapInput.setCustomValidity('URL is not an image or cannot be reached.');
                 mapInput.reportValidity();
                 return;
             }
 
-            let path = window.location.pathname + '?map=' + mapInput.value;
+            // Check if we have a save for this map?
+            if (localData.hasMap(mapPath)) {
+                return WarningModal.make({
+                    notice: "Existing encounter detected.",
+                    explanation: "You have an active encounter running on this map already. Your previous settings will be used.",
+                    callback: () => { this.sendToEncounter(mapPath); }
+                });
+            }
+
+            this.sendToEncounter(mapPath);
+        },
+        sendToEncounter: function(mapPath){
+            let path = window.location.pathname + '?map=' + mapPath;
 
             if (this.playersComponent && this.el.querySelector('.advanced').classList.contains('show')) {
                 path += this.playersComponent.toUrlString();
@@ -19469,7 +19540,6 @@
 
             // Do you have any saved maps?
             const saves = localData.getMaps();
-
 
             if (saves.length !== 0) {
                 const saveZone = savesTlp.render(saves);

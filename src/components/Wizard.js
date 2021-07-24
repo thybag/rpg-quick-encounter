@@ -1,10 +1,11 @@
 import Component from 'lumpjs/src/component.js';
 import AddPlayers from './Wizard/AddPlayers.js';
+import WarningModal from './Modals/WarningModal.js';
 
 import applyDefaults from '../utils/applyDefaults';
 import localData from '../services/localData';
 
-import Template from '../utils/template.js';
+import Template from 'lumpjs/src/template.js';
 // utils
 import checkImage from '../utils/checkImage.js';
 
@@ -84,9 +85,12 @@ export default Component.define({
         if (e.key == 'Enter' || e.keyCode == 13) {
             this.startEncounter();
         }
+        // Clear custom validation on change
+        e.target.setCustomValidity('');
     },
     startEncounter: async function() {
         const mapInput = this.el.querySelector('input[name=map]');
+        const mapPath = mapInput.value;
 
         // Check its a url
         if (!mapInput.checkValidity()) {
@@ -96,14 +100,28 @@ export default Component.define({
 
         // Check its a valid image
         try {
-            await checkImage(mapInput.value);
+            await checkImage(mapPath);
         } catch (e) {
             mapInput.setCustomValidity('URL is not an image or cannot be reached.');
             mapInput.reportValidity();
             return;
         }
 
-        let path = window.location.pathname + '?map=' + mapInput.value;
+        // Check if we have a save for this map?
+        if (localData.hasMap(mapPath)) {
+            return WarningModal.make({
+                notice: 'Existing encounter detected.',
+                explanation: 'You have an active encounter running on this map already. Your previous settings will be used.',
+                callback: () => {
+                    this.sendToEncounter(mapPath);
+                },
+            });
+        }
+
+        this.sendToEncounter(mapPath);
+    },
+    sendToEncounter: function(mapPath) {
+        let path = window.location.pathname + '?map=' + mapPath;
 
         if (this.playersComponent && this.el.querySelector('.advanced').classList.contains('show')) {
             path += this.playersComponent.toUrlString();
@@ -117,7 +135,6 @@ export default Component.define({
 
         // Do you have any saved maps?
         const saves = localData.getMaps();
-
 
         if (saves.length !== 0) {
             const saveZone = savesTlp.render(saves);

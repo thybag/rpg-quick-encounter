@@ -6,7 +6,7 @@
  "dependencies": {
   "@turf/turf": "^6.2.0",
   "leaflet": "^1.7.1",
-  "lumpjs": "https://github.com/thybag/lump.js.git"
+  "lumpjs": "^0.3.2"
  },
  "scripts": {
   "start": "yarn watch",

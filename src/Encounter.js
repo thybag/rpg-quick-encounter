@@ -15,7 +15,7 @@ import {setIconPath} from './utils/getIconImage.js';
 
 export default Component.define({
     initialize: function(config) {
-    // Take control of root
+        // Take control of root
         this.el.classList = 'app';
 
         // Apply defaults and sanity check
@@ -51,16 +51,11 @@ export default Component.define({
         this.el.appendChild(controlEl);
 
         // Boot Core Components
-        const map = EncounterMap.make({el: mapEl, state: mapState});
-        const players = Players.make({el: playerEl, players: mapState.get('players')});
+        EncounterMap.make({el: mapEl, state: mapState});
+        Players.make({el: playerEl, players: mapState.get('players')});
         Controls.make({el: controlEl, state: mapState});
 
         this.initSync(mapState);
-
-        /* to refactor */
-        players.on('map:player:focus', function(player) {
-            map.trigger('map:player:focus', player);
-        });
     },
     initSync: function(mapState) {
         const map = mapState.get('map');

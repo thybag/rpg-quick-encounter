@@ -20,6 +20,7 @@ function makeMarker(position) {
     );
 }
 
+// Used to ensure bring to front always works.
 let globalZIndexOffset = 0;
 
 export default Component.define({
@@ -34,6 +35,7 @@ export default Component.define({
         'marker:dragend': 'characterDragend',
         'marker:contextmenu': 'characterRemove',
         'data:change': 'render',
+        'data:focus': 'panTo',
     },
     initialize: function({ref, map}) {
         // Store key vals
@@ -62,6 +64,7 @@ export default Component.define({
         this.map.on('zoomstart', (e) => this.trigger('marker:zoomstart', e));
 
         this.ref.on('update', (e) => this.trigger('data:change', e));
+        this.ref.on('focus', (e) => this.trigger('data:focus', e));
 
         // Make icon
         this.render();
@@ -95,7 +98,7 @@ export default Component.define({
         event.preventDefault;
 
         ConfirmModal.make({
-            question: 'Remove character from map?',
+            question: `Remove ${this.ref.name} from map?`,
             callback: () => {
                 this.ref.spawned = false;
             },

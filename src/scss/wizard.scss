@@ -110,6 +110,14 @@
     }
     .wizard .player-option span.remove {
         cursor:pointer;
+        border: 1px solid #ddd;
+        padding: .6rem 1rem;
+        color: #ddd;
+        margin-top:1px;
+
+        &:hover {
+          background: #efefef
+        }
     }
         
     .wizard .player-option input {

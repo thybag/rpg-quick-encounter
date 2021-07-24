@@ -57,8 +57,7 @@ export default Component.define({
             return;
         }
 
-        // If already spawned lets focus them
-        this.trigger('map:player:focus', player);
+        player.trigger('focus');
     },
     makePlayerCard: function(player) {
         // Skip removed players

@@ -1,7 +1,8 @@
-import Component from 'lumpjs/src/component.js';
-import createMap from '../utils/leafletMap.js';
-import fogOfWar from '../utils/fogOfWar.js';
 import Character from './Map/Character.js';
+import fogOfWar from '../utils/fogOfWar.js';
+import createMap from '../utils/leafletMap.js';
+import Component from 'lumpjs/src/component.js';
+import WarningModal from './Modals/WarningModal.js';
 
 const playerToIconMap = {};
 const npcToIconMap = {};
@@ -17,12 +18,24 @@ export default Component.define({
     fog: null,
     // Setup
     initialize: async function(config) {
-    // SetID
+        // SetID
         this.el.id = 'map';
         this.options = config.state;
 
         // Setup map itself
-        this.map = await createMap('map', this.options.get('map'));
+        try {
+            this.map = await createMap('map', this.options.get('map'));
+        } catch (e) {
+            // Fatal error, map cannot be loaded. Abort and show error.
+            return WarningModal.make({
+                notice: 'Unable to load map image',
+                explanation: `The map URL you have provided can not be loaded.
+                              Please check that the URL is correct and refers directly to the map image you would like to use.`,
+                callback: (e) => {
+                    window.location.href = window.location.pathname;
+                },
+            });
+        }
         this.fog = fogOfWar(this.map);
 
         // Register leaflet Listeners
@@ -40,7 +53,6 @@ export default Component.define({
         // Local events
         'map:click': 'fogClear',
         'map:contextmenu': 'fogAdd',
-        'map:player:focus': 'focusPlayer',
         // mob data listeners
         'create:players.*': 'spawnPlayer',
         'create:spawns.*': 'spawnNpc',
@@ -66,9 +78,6 @@ export default Component.define({
     },
     generateMarker: function(name, img, ref) {
         return Character.make({ref: ref, map: this.map});
-    },
-    focusPlayer: function(player) {
-        playerToIconMap[player.id].panTo();
     },
     fogToggled: function(newValue) {
         if (newValue) {

@@ -8,9 +8,13 @@
     z-index: 1020;
     background: #fff;
     padding-bottom: .5rem;
+    cursor: initial;
 
     h2 {
         @include modal-h2;
+    }
+    p {
+        padding: .5rem 1rem;
     }
     div {
         display:block;

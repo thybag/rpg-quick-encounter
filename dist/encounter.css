@@ -285,12 +285,16 @@ input[type=submit]:hover, button:hover {
   z-index: 1020;
   background: #fff;
   padding-bottom: 0.5rem;
+  cursor: initial;
 }
 .confirm-modal h2 {
   background: #24c37e;
   padding: 0.5rem;
   color: #fff;
   margin: 0;
+}
+.confirm-modal p {
+  padding: 0.5rem 1rem;
 }
 .confirm-modal div {
   display: block;
@@ -513,6 +517,13 @@ input[type=submit]:hover, button:hover {
 
 .wizard .player-option span.remove {
   cursor: pointer;
+  border: 1px solid #ddd;
+  padding: 0.6rem 1rem;
+  color: #ddd;
+  margin-top: 1px;
+}
+.wizard .player-option span.remove:hover {
+  background: #efefef;
 }
 
 .wizard .player-option input {
