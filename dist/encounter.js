@@ -15018,14 +15018,14 @@
     const monsterIcons = 33;
     let iconPath = 'assets/';
 
-    const iconList$3 = []; const monsterList = [];
+    const iconList$2 = []; const monsterList = [];
 
-    for (let i = 1; i <= playerIcons; i++) iconList$3.push('p:' + i);
+    for (let i = 1; i <= playerIcons; i++) iconList$2.push('p:' + i);
     for (let i = 1; i <= monsterIcons; i++) monsterList.push('m:' + i);
 
     // Get all player icons
     const getPlayerIcons = function() {
-        return iconList$3;
+        return iconList$2;
     };
     // Get all monster icons
     const getMonsterIcons = function() {
@@ -15039,7 +15039,7 @@
 
     // Get random player icon
     const getRandomPlayerIcon = function() {
-        return iconList$3[Math.floor((Math.random() * iconList$3.length))];
+        return iconList$2[Math.floor((Math.random() * iconList$2.length))];
     };
 
     // Get random monster icon
@@ -15050,7 +15050,7 @@
     // Get player icons as unique list
     const getRandomPlayerIconList = function() {
         // No point using a smarter algo for 8 elements.
-        return iconList$3.sort(() => Math.random() - 0.5);
+        return iconList$2.sort(() => Math.random() - 0.5);
     };
 
     // Change icon path if being used via another app
@@ -15138,7 +15138,7 @@
         });
     }
 
-    const iconList$2 = new Template({
+    const iconList$1 = new Template({
         template: () => {
             let NPCList = ''; let MonsterList = ''; let CustomList = '';
 
@@ -15170,7 +15170,7 @@
      * @param  {[type]} iconImg [description]
      * @return {[type]}         [description]
      */
-    async function loadFile$2(iconImg) {
+    async function loadFile$1(iconImg) {
         const imgData = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(iconImg);
@@ -15187,8 +15187,8 @@
      * @param  {[type]} iconImg [description]
      * @return {[type]}         [description]
      */
-    async function imageToIcon$2(iconImg) {
-        const img = await loadFile$2(iconImg);
+    async function imageToIcon$1(iconImg) {
+        const img = await loadFile$1(iconImg);
 
         // Local storage is small so we wanna scale it down before we save
         const canvas = document.createElement('canvas');
@@ -15202,7 +15202,7 @@
         return canvas.toDataURL('image/webp', 0.8);
     }
 
-    var ImagePicker$2 = Component$1.define({
+    var ImagePicker$1 = Component$1.define({
         initialize: function(options) {
             this.el = this.tpl();
             this.parent = options.target;
@@ -15265,7 +15265,7 @@
                 // Only deal with images
                 if (!file.type.match('image.*')) continue;
 
-                const newIcon = await imageToIcon$2(file);
+                const newIcon = await imageToIcon$1(file);
                 localData.saveIcon(newIcon);
             }
             this.render();
@@ -15284,7 +15284,7 @@
             }
         },
         render: async function() {
-            this.el.querySelector('main').innerHTML = iconList$2.render().innerHTML;
+            this.el.querySelector('main').innerHTML = iconList$1.render().innerHTML;
         },
     });
 
@@ -15323,7 +15323,7 @@
         },
         // Open image picker
         openPickList: function(e, target) {
-            ImagePicker$2.make({target});
+            ImagePicker$1.make({target});
         },
         focus: function(e) {
             // Set focus to input
@@ -18351,7 +18351,7 @@
             // Render base template
             this.el = this.tpl(
                 options.notice,
-                options.explanation
+                options.explanation,
             );
 
             // Create self on the global level as needed.
@@ -18405,9 +18405,12 @@
             } catch (e) {
                 // Fatal error, map cannot be loaded. Abort and show error.
                 return WarningModal.make({
-                    notice: "Unable to load map image",
-                    explanation: "The map URL you have provided can not be loaded. Please check that the URL is correct and refers directly to the map image you would like to use.",
-                    callback: (e) => { window.location.href = window.location.pathname; }
+                    notice: 'Unable to load map image',
+                    explanation: `The map URL you have provided can not be loaded.
+                              Please check that the URL is correct and refers directly to the map image you would like to use.`,
+                    callback: (e) => {
+                        window.location.href = window.location.pathname;
+                    },
                 });
             }
             this.fog = fogOfWar(this.map);
@@ -18778,156 +18781,6 @@
         },
     });
 
-    const iconList$1 = new Template({
-        template: () => {
-            let NPCList = ''; let MonsterList = ''; let CustomList = '';
-
-            getPlayerIcons().forEach((i) => {
-                NPCList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-            });
-            getMonsterIcons().forEach((i) => {
-                MonsterList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-            });
-            getCustomIcons().forEach((i) => {
-                CustomList += `<img src="${getIconImage(i)}" data-id="${i}">`;
-            });
-
-            return `
-      <div>Your images</div>
-          <span>+</span> 
-          ${CustomList}
-      <div>NPCs/Players</div>
-          ${NPCList}
-      <div>Monsters</div>
-          ${MonsterList}
-      `;
-        },
-    });
-
-    /**
-     * load filedata from upload
-     *
-     * @param  {[type]} iconImg [description]
-     * @return {[type]}         [description]
-     */
-    async function loadFile$1(iconImg) {
-        const imgData = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(iconImg);
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = reject;
-        });
-
-        return checkImage(imgData);
-    }
-
-    /**
-     * resize and return as final icon image to store
-     *
-     * @param  {[type]} iconImg [description]
-     * @return {[type]}         [description]
-     */
-    async function imageToIcon$1(iconImg) {
-        const img = await loadFile$1(iconImg);
-
-        // Local storage is small so we wanna scale it down before we save
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
-        // draw source image into the off-screen canvas:
-        canvas.width = 70;
-        canvas.height = 70;
-        ctx.drawImage(img, 0, 0, 70, 70);
-
-        return canvas.toDataURL('image/webp', 0.8);
-    }
-
-    var ImagePicker$1 = Component$1.define({
-        initialize: function(options) {
-            this.el = this.tpl();
-            this.parent = options.target;
-
-            this.render();
-            // Add to world
-            document.body.appendChild(this.el);
-        },
-        className: 'modal',
-        template: () => {
-            return `
-            <div class='image-picker'>
-                <h2>Image picker</h2>
-                 <main></main>
-                <footer><button>Cancel</button></footer>
-            </div>
-        `;
-        },
-        events: {
-            'click img': 'select',
-            'click span': 'addIcon',
-            // Close options
-            'click button': 'close',
-            'click .modal': 'close',
-            // Upload options
-            'dragover main': 'uploadEnable',
-            'drop main': 'upload',
-            'dragenter main': 'uploadFocus',
-            'dragleave main': 'uploadBlur',
-        },
-        uploadEnable: function(e) {
-            // Need this to be able to upload.
-            e.preventDefault();
-        },
-        select: function(e, item) {
-            this.parent.src = item.src;
-            this.parent.dataset.id = (item.dataset.id) ? item.dataset.id : item.src;
-
-            this.close();
-        },
-        close: function() {
-            this.destroy();
-        },
-        uploadFocus: function(e) {
-            e.preventDefault();
-            this.el.querySelector('.image-picker').classList.add('uploadHover');
-        },
-        uploadBlur: function(e) {
-            e.preventDefault();
-            this.el.querySelector('.image-picker').classList.remove('uploadHover');
-        },
-        upload: async function(e) {
-            e.preventDefault();
-
-            const files = e.dataTransfer.files;
-
-            // Get files that were dragged
-            for (let f = 0; f < files.length; f++) {
-                const file = files[f];
-                // Only deal with images
-                if (!file.type.match('image.*')) continue;
-
-                const newIcon = await imageToIcon$1(file);
-                localData.saveIcon(newIcon);
-            }
-            this.render();
-            this.uploadBlur(e);
-        },
-        addIcon: async function() {
-            const iconPath = prompt('Icon image url');
-            if (iconPath) {
-                try {
-                    await checkImage(iconPath);
-                    localData.saveIcon(iconPath);
-                    this.render();
-                } catch (e) {
-                    alert('failed to load image');
-                }
-            }
-        },
-        render: async function() {
-            this.el.querySelector('main').innerHTML = iconList$1.render().innerHTML;
-        },
-    });
-
     var SpawnControls = Component$1.define({
         spawns: null,
         initialize: function(options) {
@@ -19087,7 +18940,6 @@
      * @return {[type]}           [description]
      */
     function applySettings(base, overrides) {
-
         for (const [key, value] of Object.entries(overrides)) {
             if (typeof value === 'object' && value !== null) {
                 base[key] = applySettings(base[key] ?? {}, value);
@@ -19517,15 +19369,17 @@
             // Check if we have a save for this map?
             if (localData.hasMap(mapPath)) {
                 return WarningModal.make({
-                    notice: "Existing encounter detected.",
-                    explanation: "You have an active encounter running on this map already. Your previous settings will be used.",
-                    callback: () => { this.sendToEncounter(mapPath); }
+                    notice: 'Existing encounter detected.',
+                    explanation: 'You have an active encounter running on this map already. Your previous settings will be used.',
+                    callback: () => {
+                        this.sendToEncounter(mapPath);
+                    },
                 });
             }
 
             this.sendToEncounter(mapPath);
         },
-        sendToEncounter: function(mapPath){
+        sendToEncounter: function(mapPath) {
             let path = window.location.pathname + '?map=' + mapPath;
 
             if (this.playersComponent && this.el.querySelector('.advanced').classList.contains('show')) {
